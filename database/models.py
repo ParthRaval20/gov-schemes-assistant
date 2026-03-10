@@ -9,13 +9,12 @@ class Scheme(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    category = Column(String)
     scheme_name = Column(String)
+    application_link = Column(String)
     description = Column(Text)
     benefits = Column(Text)
     eligibility = Column(Text)
     documents_required = Column(Text)
-
-    application_link = Column(String)
-    state = Column(String)
-    category = Column(String)
+    application_process = Column(Text)
     
