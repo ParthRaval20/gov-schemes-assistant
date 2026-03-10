@@ -1,0 +1,66 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+.envrc
+
+# Packaging/build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test/typing/lint/cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+coverage.xml
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# --- Local secrets/config ---
+.env
+.env.*
+
+# --- Data / generated outputs ---
+
+# (Keep these patterns scoped to data/ to avoid over-ignoring.)
+data/**/*.parquet
+data/**/*.jsonl
+data/**/*.ndjson
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# --- Playwright (scraping) ---
+playwright-report/
+test-results/
+ms-playwright/
+.playwright/
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.vscode/
+.idea/
