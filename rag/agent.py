@@ -51,13 +51,29 @@ llm = ChatMistralAI(
 
 prompt = ChatPromptTemplate.from_messages([
     ("system",
-     "You are an AI assistant that helps users find Indian government schemes."),
+     """You are an AI assistant that helps users find Indian government schemes.
+     When listing multiple schemes, number each one clearly.
+     For each scheme respond in this exact format with short and concise values only:
+
+     1. Scheme Name         : (name only)
+        Description         : (1-2 lines max)
+        Category            : (1-3 words)
+        Benefits            : (2-3 key points only)
+        Eligibility         : (2-3 key conditions only)
+        Application Process : (2-3 steps max)
+        Required Documents  : (3-5 main documents only)
+        State               : (state name or Central)
+        Link                : (url only)
+
+     Keep every field short and to the point. No long paragraphs.
+     If a field is not available, write 'Not Available'.
+     Do not use JSON."""),
 
     ("placeholder", "{chat_history}"),
 
     ("human",
 """
-Using ONLY the context below, return scheme details.
+Using ONLY the context below, answer the question.
 
 Context:
 {context}
@@ -127,7 +143,7 @@ chain = (
     }
     | prompt
     | llm
-    | StrOutputParser()
+    | StrOutputParser()     # Returns plain string
 )
 
 # -------------------------------------------------
@@ -155,32 +171,12 @@ chain_with_memory = RunnableWithMessageHistory(
 )
 
 # -------------------------------------------------
-# Ask function
+# Ask function — returns plain string
 # -------------------------------------------------
 
-def ask_agent(question: str, session_id="user_1"):
+def ask_agent(question: str, session_id="user_1") -> str:
 
     return chain_with_memory.invoke(
         {"question": question},
         config={"configurable": {"session_id": session_id}}
     )
-
-# -------------------------------------------------
-# CLI Test
-# -------------------------------------------------
-
-if __name__ == "__main__":
-
-    print("\nAI Government Scheme Assistant")
-    print("Type 'exit' to stop\n")
-
-    while True:
-
-        q = input("Ask: ")
-
-        if q.lower() == "exit":
-            break
-
-        answer = ask_agent(q)
-
-        print("\nAI:", answer)
