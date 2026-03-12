@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🇮🇳 Yojana AI — Gujarat Government Scheme Assistant</title>
+  <title>🇮🇳 Yojana AI — Government Scheme Assistant</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
   <style>
@@ -397,6 +397,113 @@
     .chat-container::-webkit-scrollbar { width: 6px; }
     .chat-container::-webkit-scrollbar-track { background: transparent; }
     .chat-container::-webkit-scrollbar-thumb { background: #d0c8b8; border-radius: 3px; }
+
+    /* ── Eligibility Result Cards ── */
+    .eligibility-wrapper { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
+    .eligibility-header {
+      background: linear-gradient(135deg, #0a5c0a, #138808);
+      color: white;
+      border-radius: 12px 12px 0 0;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .profile-summary {
+      background: #f0fff0;
+      border: 1px solid #b8e0b8;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 4px;
+    }
+    .profile-summary-title {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--green);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .profile-tag {
+      background: white;
+      border: 1px solid #b8e0b8;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 12px;
+      color: #0a5c0a;
+    }
+    .eligible-scheme-card {
+      background: white;
+      border: 1px solid #c8e6c9;
+      border-left: 4px solid var(--green);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .eligible-scheme-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .eligible-why {
+      font-size: 12px;
+      color: #2e7d32;
+      background: #f1f8e9;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+    .eligible-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .eligible-badge {
+      font-size: 11px;
+      background: #EEF2FF;
+      color: #3730a3;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .eligible-badge.state { background: #FFF3E0; color: #e65100; }
+
+    /* ── Eligibility For Shown Cards ── */
+    .check-scheme-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .check-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .check-scheme-name {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 4px;
+    }
+    .check-reason { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .check-scheme-card.eligible { border-left: 4px solid var(--green); }
+    .check-scheme-card.not-eligible { border-left: 4px solid #e53935; }
+    .summary-bar {
+      background: var(--navy);
+      color: white;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -406,7 +513,7 @@
     <span class="flag-icon">🇮🇳</span>
     <div class="brand-text">
       <h1>YOJANA AI</h1>
-      <span>Gujarat Government Scheme Assistant</span>
+      <span>Government Scheme Assistant</span>
     </div>
   </div>
   <div class="header-actions">
@@ -419,7 +526,8 @@
   <div class="chip" onclick="sendChip(this)">Women welfare schemes</div>
   <div class="chip" onclick="sendChip(this)">Education scholarships</div>
   <div class="chip" onclick="sendChip(this)">Healthcare schemes</div>
-  <div class="chip" onclick="sendChip(this)">housing scheme</div>
+  <div class="chip" onclick="sendChip(this)">Which schemes am I eligible for?</div>
+  <div class="chip" onclick="sendChip(this)">PM housing scheme</div>
   <div class="chip" onclick="sendChip(this)">Startup schemes for youth</div>
   <div class="chip" onclick="sendChip(this)">Schemes in Gujarat</div>
   <div class="chip" onclick="sendChip(this)">Skill development programs</div>
@@ -429,7 +537,7 @@
   <div class="welcome-card">
     <span class="wheel">☸️</span>
     <h2>Jai Hind! How can I help you?</h2>
-    <p>Ask me about any Gujarat government scheme — eligibility, benefits, required documents, application process, and official links.</p>
+    <p>Ask me about any Indian government scheme — eligibility, benefits, required documents, application process, and official links.</p>
   </div>
 </div>
 
@@ -522,6 +630,12 @@ function renderResult(result) {
     const cards = (result.schemes || []).map((s, i) => buildSchemeCard(s, i + 1)).join('');
     content = `<div class="schemes-wrapper">${cards}</div>`;
   }
+  else if (result.type === 'eligibility_result') {
+    content = buildEligibilityResult(result);
+  }
+  else if (result.type === 'eligibility_for_shown') {
+    content = buildEligibilityForShown(result);
+  }
   else if (result.error) {
     content = `<div class="bubble ai" style="color:#c00;">⚠️ Error: ${escapeHtml(result.error)}</div>`;
   }
@@ -578,6 +692,88 @@ function buildSchemeCard(s, i) {
   </div>`;
 }
 
+function buildProfileSummary(profile) {
+  if (!profile) return '';
+  const LABELS = { age: 'Age', income: 'Income', occupation: 'Occupation',
+                   state: 'State', gender: 'Gender', caste_category: 'Category', extra: 'Other' };
+  const GENDER_ICON = { female: '👩', woman: '👩', male: '👨', man: '👨' };
+  const tags = Object.entries(profile)
+    .filter(([, v]) => v)
+    .map(([k, v]) => {
+      let display = escapeHtml(String(v));
+      if (k === 'gender') {
+        const icon = GENDER_ICON[(String(v)).toLowerCase()] || '🧑';
+        display = `${icon} ${display}`;
+      }
+      return `<span class="profile-tag">${LABELS[k] || k}: ${display}</span>`;
+    })
+    .join('');
+  if (!tags) return '';
+  return `<div class="profile-summary">
+    <div class="profile-summary-title">👤 Your Profile</div>
+    <div class="profile-tags">${tags}</div>
+  </div>`;
+}
+
+function buildEligibilityResult(result) {
+  const schemes = result.schemes || [];
+  const profileHtml = buildProfileSummary(result.profile);
+  const cards = schemes.map((s, i) => {
+    const link = s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
+      ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;">🔗 Official Site ↗</a>`
+      : '';
+    return `<div class="eligible-scheme-card">
+      <div class="eligible-scheme-name">${i+1}. ${escapeHtml(s.scheme_name || 'Unknown')}</div>
+      ${s.why_eligible ? `<div class="eligible-why">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
+      <div class="eligible-meta">
+        ${s.category ? `<span class="eligible-badge">${escapeHtml(s.category)}</span>` : ''}
+        ${s.state ? `<span class="eligible-badge state">📍 ${escapeHtml(s.state)}</span>` : ''}
+        ${link}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="eligibility-wrapper">
+    <div class="eligibility-header">🎯 Eligibility Results — ${schemes.length} Scheme(s) Found</div>
+    ${profileHtml}
+    ${cards}
+    <div class="bubble ai" style="font-size:13px;color:var(--muted);">
+      💡 Ask for full details of any scheme above.
+    </div>
+  </div>`;
+}
+
+function buildEligibilityForShown(result) {
+  const schemes = result.schemes || [];
+  const profileHtml = buildProfileSummary(result.profile);
+  const eligible = schemes.filter(s => s.is_eligible);
+  const notEligible = schemes.filter(s => !s.is_eligible);
+
+  const cards = schemes.map((s, i) => {
+    const icon = s.is_eligible ? '✅' : '❌';
+    const cls = s.is_eligible ? 'eligible' : 'not-eligible';
+    const link = s.is_eligible && s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
+      ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;">🔗 Site ↗</a>` : '';
+    return `<div class="check-scheme-card ${cls}">
+      <div class="check-icon">${icon}</div>
+      <div>
+        <div class="check-scheme-name">${i+1}. ${escapeHtml(s.scheme_name || 'Unknown')}</div>
+        ${s.reason ? `<div class="check-reason">${escapeHtml(s.reason)}</div>` : ''}
+        ${link}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="eligibility-wrapper">
+    <div class="eligibility-header">🎯 Eligibility Check — ${schemes.length} Schemes Reviewed</div>
+    ${profileHtml}
+    ${cards}
+    <div class="summary-bar">
+      ✅ ${eligible.length} Eligible &nbsp;|&nbsp; ❌ ${notEligible.length} Not Eligible
+    </div>
+  </div>`;
+}
+
 async function sendMessage() {
   const q = input.value.trim();
   if (!q) return;
@@ -611,7 +807,7 @@ async function clearChat() {
   chat.innerHTML = `<div class="welcome-card">
     <span class="wheel">☸️</span>
     <h2>New conversation started!</h2>
-    <p>Ask me about any Gujarat government scheme.</p>
+    <p>Ask me about any Indian government scheme.</p>
   </div>`;
 }
 </script>

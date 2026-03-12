@@ -5,21 +5,21 @@ import os
 import sys
 
 warnings.filterwarnings("ignore")
-try:
-    from dotenv import load_dotenv  # type: ignore
 
+try:
+    from dotenv import load_dotenv
     load_dotenv()
 except ModuleNotFoundError:
-    # Allow running without python-dotenv; env vars can still be set normally.
     pass
 
-# Ensure repo root is on PYTHONPATH so `rag/` imports work
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+# Adds gov-schemes-assistant/ to path so `rag/agent.py` can be imported
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+sys.path.insert(0, REPO_ROOT)
+
+from rag.agent import ask_agent
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key-change-this"  # Change this in production
+app.secret_key = "yojana-ai-secret-key-change-in-production"
 
 
 @app.route("/")
@@ -40,24 +40,6 @@ def ask():
     session_id = session.get("session_id", "default_user")
 
     try:
-        try:
-            # Import lazily so the web UI can start even if
-            # the heavy RAG dependencies aren't installed yet.
-            from rag.agent import ask_agent  # type: ignore
-        except ModuleNotFoundError as e:
-            missing = getattr(e, "name", None) or str(e)
-            return (
-                jsonify(
-                    {
-                        "error": (
-                            f"Missing Python dependency: {missing}. "
-                            "Install the agent requirements and restart the server."
-                        )
-                    }
-                ),
-                500,
-            )
-
         result = ask_agent(question, session_id=session_id)
         return jsonify(result)
     except Exception as e:
