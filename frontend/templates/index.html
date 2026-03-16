@@ -100,6 +100,30 @@
     }
     .btn-ghost:hover { background: rgba(255,255,255,0.22); }
 
+    /* ── Language Selector ── */
+    .lang-selector {
+      display: flex;
+      gap: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.7);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .lang-btn:hover { color: white; background: rgba(255,255,255,0.15); }
+    .lang-btn.active { background: white; color: var(--navy); }
+
     /* ── Suggestions bar ── */
     .suggestions-bar {
       background: white;
@@ -410,6 +434,11 @@
     </div>
   </div>
   <div class="header-actions">
+    <div class="lang-selector">
+      <button class="lang-btn active" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="hi" onclick="setLang('hi')">हिं</button>
+      <button class="lang-btn" data-lang="gu" onclick="setLang('gu')">ગુ</button>
+    </div>
     <button class="btn-ghost" onclick="clearChat()">⟳ New Chat</button>
   </div>
 </header>
@@ -522,8 +551,74 @@ function renderResult(result) {
     const cards = (result.schemes || []).map((s, i) => buildSchemeCard(s, i + 1)).join('');
     content = `<div class="schemes-wrapper">${cards}</div>`;
   }
+  else if (result.type === 'eligibility_result') {
+    const schemes = result.schemes || [];
+    const profile = result.profile || {};
+    const profileLines = Object.entries({
+      'Age': profile.age, 'Income': profile.income, 'Occupation': profile.occupation,
+      'State': profile.state, 'Gender': profile.gender, 'Caste/Category': profile.caste_category
+    }).filter(([,v]) => v).map(([k,v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
+
+    const schemeCards = schemes.map((s, i) => `
+      <div style="background:#f9f9f9;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="background:var(--green);color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</span>
+          <strong style="color:var(--navy);font-size:14px">${escapeHtml(s.scheme_name || '')}</strong>
+        </div>
+        ${s.why_eligible ? `<div style="color:#138808;font-size:12px;margin-top:4px">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
+        ${s.category ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📂 ${escapeHtml(s.category)}</div>` : ''}
+        ${s.state ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📍 ${escapeHtml(s.state)}</div>` : ''}
+        ${s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
+          ? `<div style="margin-top:6px"><a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value">🔗 Visit Official Site ↗</a></div>` : ''}
+      </div>`).join('');
+
+    content = `<div class="bubble ai">
+      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligible Schemes Found (${schemes.length})</strong>
+      ${profileLines ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.8">${profileLines}</div>` : ''}
+      ${schemeCards}
+      ${schemes.length > 0 ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">💡 Ask for full details of any scheme above.</div>` : ''}
+    </div>`;
+  }
+  else if (result.type === 'eligibility_for_shown') {
+    const schemes = result.schemes || [];
+    const profile = result.profile || {};
+    const profileLines = Object.entries({
+      'Age': profile.age, 'Income': profile.income, 'Occupation': profile.occupation,
+      'State': profile.state, 'Gender': profile.gender, 'Caste/Category': profile.caste_category
+    }).filter(([,v]) => v).map(([k,v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
+
+    const eligible = schemes.filter(s => s.is_eligible);
+    const notEligible = schemes.filter(s => !s.is_eligible);
+
+    const schemeRows = schemes.map((s, i) => {
+      const icon = s.is_eligible ? '✅' : '❌';
+      const color = s.is_eligible ? '#138808' : '#c00';
+      return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:15px;flex-shrink:0">${icon}</span>
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--navy)">${escapeHtml(s.scheme_name || '')}</div>
+          <div style="font-size:12px;color:${color};margin-top:2px">${escapeHtml(s.reason || '')}</div>
+          ${s.is_eligible && s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
+            ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;margin-top:4px;display:inline-block">🔗 Apply here ↗</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    content = `<div class="bubble ai">
+      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligibility Check Results</strong>
+      ${profileLines ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.8">${profileLines}</div>` : ''}
+      <div style="margin-top:10px">${schemeRows}</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+        📊 <b>${eligible.length}</b> eligible &nbsp;|&nbsp; <b>${notEligible.length}</b> not eligible
+      </div>
+    </div>`;
+  }
   else if (result.error) {
     content = `<div class="bubble ai" style="color:#c00;">⚠️ Error: ${escapeHtml(result.error)}</div>`;
+  }
+  else {
+    // Fallback — should never happen but prevents blank messages
+    content = `<div class="bubble ai" style="color:var(--muted);">Received an unexpected response. Please try again.</div>`;
   }
 
   row.innerHTML = avatar + content;
@@ -592,7 +687,7 @@ async function sendMessage() {
     const res = await fetch('/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q })
+      body: JSON.stringify({ question: q, lang: currentLang })
     });
     const data = await res.json();
     removeTyping();
@@ -613,6 +708,57 @@ async function clearChat() {
     <h2>New conversation started!</h2>
     <p>Ask me about any Gujarat government scheme.</p>
   </div>`;
+}
+
+// ── Language Switcher ────────────────────────────────────────────────────────
+const LANG_UI = {
+  en: {
+    placeholder: "Ask about any government scheme…",
+    hint: "Press Enter to send · Shift+Enter for new line",
+    chips: [
+      "Schemes for farmers 🌾", "Women welfare schemes", "Education scholarships",
+      "Healthcare schemes", "housing scheme",
+      "Startup schemes for youth", "Schemes in Gujarat", "Skill development programs"
+    ]
+  },
+  hi: {
+    placeholder: "सरकारी योजना के बारे में पूछें…",
+    hint: "Enter दबाएं भेजने के लिए · Shift+Enter नई लाइन के लिए",
+    chips: [
+      "किसानों के लिए योजनाएं 🌾", "महिला कल्याण योजनाएं", "शिक्षा छात्रवृत्ति",
+      "स्वास्थ्य योजनाएं", "आवास योजना",
+      "युवाओं के लिए स्टार्टअप योजनाएं", "गुजरात में योजनाएं", "कौशल विकास कार्यक्रम"
+    ]
+  },
+  gu: {
+    placeholder: "સરકારી યોજના વિશે પૂછો…",
+    hint: "Enter દબાવો મોકલવા માટે · Shift+Enter નવી લીટી માટે",
+    chips: [
+      "ખેડૂતો માટે યોજનાઓ 🌾", "મહિલા કલ્યાણ યોજનાઓ", "શિક્ષણ શિષ્યવૃત્તિ",
+      "આરોગ્ય સેવા યોજનાઓ", "આવાસ યોજના",
+      "યુવાનો માટે સ્ટાર્ટઅપ યોજનાઓ", "ગુજરાતમાં યોજનાઓ", "કૌશલ્ય વિકાસ કાર્યક્રમ"
+    ]
+  }
+};
+
+let currentLang = 'en';  // tracks which language button is active
+
+function setLang(lang) {
+  currentLang = lang;
+  // Update active button
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang)
+  );
+  const L = LANG_UI[lang];
+  // Update input placeholder
+  document.getElementById('question-input').placeholder = L.placeholder;
+  // Update hint text
+  document.querySelector('.input-hint').textContent = L.hint;
+  // Update suggestion chips
+  const bar = document.getElementById('suggestions');
+  bar.innerHTML = L.chips
+    .map(c => `<div class="chip" onclick="sendChip(this)">${c}</div>`)
+    .join('');
 }
 </script>
 </body>

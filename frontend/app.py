@@ -3,14 +3,13 @@ import warnings
 import uuid
 import os
 import sys
+import threading
 
 warnings.filterwarnings("ignore")
 try:
     from dotenv import load_dotenv  # type: ignore
-
     load_dotenv()
 except ModuleNotFoundError:
-    # Allow running without python-dotenv; env vars can still be set normally.
     pass
 
 # Ensure repo root is on PYTHONPATH so `rag/` imports work
@@ -20,6 +19,24 @@ if REPO_ROOT not in sys.path:
 
 app = Flask(__name__)
 app.secret_key = "your-secret-key-change-this"  # Change this in production
+
+
+# -------------------------------------------------
+# ✅ Background warmup — runs as soon as Flask starts.
+#    Loads the HuggingFace embedding model (~300MB) and
+#    initializes the Mistral LLM client in the background,
+#    so they are ready before the first user request arrives.
+# -------------------------------------------------
+
+def _warmup():
+    try:
+        from rag.agent import warmup
+        warmup()
+    except Exception as e:
+        print(f"⚠️  Warmup failed (non-fatal): {e}")
+
+# daemon=True means this thread won't block app shutdown
+threading.Thread(target=_warmup, daemon=True).start()
 
 
 @app.route("/")
@@ -33,6 +50,7 @@ def index():
 def ask():
     data = request.get_json()
     question = data.get("question", "").strip()
+    ui_lang  = data.get("lang", None)   # "en", "hi", or "gu" sent from UI language button
 
     if not question:
         return jsonify({"error": "Empty question"}), 400
@@ -41,24 +59,18 @@ def ask():
 
     try:
         try:
-            # Import lazily so the web UI can start even if
-            # the heavy RAG dependencies aren't installed yet.
             from rag.agent import ask_agent  # type: ignore
         except ModuleNotFoundError as e:
             missing = getattr(e, "name", None) or str(e)
             return (
-                jsonify(
-                    {
-                        "error": (
-                            f"Missing Python dependency: {missing}. "
-                            "Install the agent requirements and restart the server."
-                        )
-                    }
-                ),
+                jsonify({"error": (
+                    f"Missing Python dependency: {missing}. "
+                    "Install the agent requirements and restart the server."
+                )}),
                 500,
             )
 
-        result = ask_agent(question, session_id=session_id)
+        result = ask_agent(question, session_id=session_id, ui_lang=ui_lang)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -71,4 +83,6 @@ def reset():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # use_reloader=False prevents Flask from running _warmup twice in debug mode
+    # (Flask's reloader spawns a child process, which would double the warmup work)
+    app.run(debug=True, port=5000, use_reloader=False)

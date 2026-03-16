@@ -11,7 +11,8 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
-import re, json
+import re, json, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # -------------------------------------------------
 # Language Support
@@ -35,8 +36,8 @@ LANG_STRINGS = {
     "gu": {
         "profile_request": """ચોકકસ! પાત્રતા તપાસવા માટે કૃપા કરીને આ માહિતી આપો:\n\n  \u2022 ઉંમર\n  \u2022 વાર્ષિક આવક  (દા.ત. 1.5 લાખ, 50,000)\n  \u2022 વ્યવસાય      (દા.ત. વિદ્યાર્થી, ખેડૂત, સ્વ-રોજગાર)\n  \u2022 રાજ્ય        (દા.ત. ગુજરાત)\n  \u2022 જાતિ         (પુરુષ / સ્ત્રી)\n  \u2022 જ્ણાતિ/વર્ગ  (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nઉદાહરણ:\n  ઉંમર: 22, આવક: 1.5 લાખ, વ્યવસાય: વિદ્યાર્થી, રાજ્ય: ગુજરાત, જ્ણાતિ: OBC, જાતિ: પુરુષ""",
         "no_schemes_found": "કોઈ મળતી યોજના મળી નહીં. કૃપા કરીને ઉંમર, આવક, વ્યવસાય, રાજ્ય અને જ્ણાતિ આપો.",
-        "no_additional_schemes": "તમારી પ્રોફાઇલ માટે કોઈ વધારાની યોજના મળી નહીં.",
-        "ask_schemes_first": "કૃપા કરીને પહેલાં કોઈ યોજના શોધો, પછી હું તમારી પાત્રતા તપાસીશ.",
+        "no_additional_schemes": "તમારી પ્રોફાઇલ માટે કોઈ વધારાની યોજना મળી નહીં.",
+        "ask_schemes_first": "કૃપા કરીને પહેલાં કોઈ યોજना શોધો, પછી હું તમારી પાત્રતા તપાસીશ.",
     },
 }
 
@@ -60,7 +61,7 @@ def translate_to_english(text: str, source_lang: str) -> str:
     if source_lang == "en":
         return text
     lang_name = {"hi": "Hindi", "gu": "Gujarati"}[source_lang]
-    r = llm.invoke(
+    r = get_llm().invoke(
         f"Translate this {lang_name} text to English.\n"
         f"Keep unchanged: scheme names, SC/ST/OBC/EWS/SEBC, state names, numbers, rupee amounts.\n"
         f"Return ONLY the English translation.\n\n{lang_name}: {text}\n\nEnglish:"
@@ -72,7 +73,7 @@ def translate_response(text: str, target_lang: str) -> str:
     if target_lang == "en":
         return text
     lang_name = {"hi": "Hindi", "gu": "Gujarati"}[target_lang]
-    r = llm.invoke(
+    r = get_llm().invoke(
         f"Translate this English text to {lang_name}.\n"
         f"Keep unchanged: scheme names, official links, SC/ST/OBC/EWS/SEBC, state names, ₹ amounts, numbers.\n"
         f"Return ONLY the {lang_name} translation.\n\nEnglish: {text}\n\n{lang_name}:"
@@ -111,19 +112,60 @@ class UserProfile(BaseModel):
     extra: Optional[str] = Field(None, description="Any other relevant info e.g. disability, BPL, marital status")
 
 # -------------------------------------------------
-# Embedding + Vector DB
+# ✅ LAZY LOADERS — models load only when first used
+#    This removes 20-30s blocking delay at import time.
 # -------------------------------------------------
 
-embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-vector_db = Chroma(persist_directory="vector_db", embedding_function=embedding_model)
+_embedding_model = None
+_vector_db = None
+_llm = None
+_structured_llm = None
+_profile_llm = None
 
-# -------------------------------------------------
-# LLMs
-# -------------------------------------------------
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        print("⏳ Loading embedding model...")
+        _embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        print("✅ Embedding model loaded.")
+    return _embedding_model
 
-llm = ChatMistralAI(model="mistral-small-latest", temperature=0.2, streaming=False)
-structured_llm = llm.with_structured_output(SchemesListOutput)
-profile_llm = llm.with_structured_output(UserProfile)
+def get_vector_db():
+    global _vector_db
+    if _vector_db is None:
+        _vector_db = Chroma(persist_directory="vector_db", embedding_function=get_embedding_model())
+    return _vector_db
+
+def get_llm():
+    global _llm
+    if _llm is None:
+        _llm = ChatMistralAI(model="mistral-small-latest", temperature=0.2, streaming=False)
+    return _llm
+
+def get_structured_llm():
+    global _structured_llm
+    if _structured_llm is None:
+        _structured_llm = get_llm().with_structured_output(SchemesListOutput)
+    return _structured_llm
+
+def get_profile_llm():
+    global _profile_llm
+    if _profile_llm is None:
+        _profile_llm = get_llm().with_structured_output(UserProfile)
+    return _profile_llm
+
+def warmup():
+    """
+    Pre-load the embedding model and LLM so the first real request is fast.
+    Call this from app.py in a background thread right after Flask starts.
+    """
+    print("🔥 Warming up models...")
+    get_embedding_model()
+    get_vector_db()
+    get_llm()
+    get_structured_llm()
+    get_profile_llm()
+    print("✅ Warmup complete — all models ready.")
 
 # -------------------------------------------------
 # Memory
@@ -139,7 +181,7 @@ def get_session(session_id: str) -> dict:
             "last_limit": None,
             "user_profile": None,
             "awaiting_profile": False,
-            "lang": "en",              # detected language for this session
+            "lang": "en",
         }
     return store[session_id]
 
@@ -195,48 +237,43 @@ def profile_to_text(profile: UserProfile) -> str:
 # -------------------------------------------------
 
 def is_direct_scheme_name_query(question: str) -> bool:
-    """
-    Returns True if the user typed a long scheme name directly (not a natural question).
-    Heuristic: long text (>6 words), no question words, no profile keywords.
-    """
     q = question.strip()
     words = q.split()
     if len(words) < 5:
         return False
-    # If it looks like a natural language question/sentence, skip
     conversational_starters = ["give me", "show me", "tell me", "find me", "what is", "which", "how", "can i", "do i", "am i", "is there", "are there"]
     q_lower = q.lower()
     if any(q_lower.startswith(s) for s in conversational_starters):
         return False
-    # If it contains strong profile keywords, it's profile input
     profile_keywords = ["age","income","salary","lakh","occupation","caste","obc","sc/st","ews"]
     if any(kw in q_lower for kw in profile_keywords):
         return False
-    # Long title-case or ALL-CAPS-words heavy text → likely a scheme name
     capitalized_words = sum(1 for w in words if w[0].isupper())
     if capitalized_words >= len(words) * 0.5:
         return True
-    # Long enough text with no verb-like question words is likely a scheme name
     question_words = ["eligible","eligib","qualify","apply","benefit","what","which","how","who","where","when","why","can","could","should","would","please","list","find","search"]
     if not any(qw in q_lower for qw in question_words) and len(words) >= 6:
         return True
     return False
 
 def detect_intent(question: str, chat_history: list, awaiting_profile: bool) -> str:
-    # Direct scheme name lookup — highest priority
     if is_direct_scheme_name_query(question):
         return "full_detail"
 
-    # If we're waiting for profile and message has profile-like content → treat as profile
     if awaiting_profile:
-        profile_keywords = ["age","income","occupation","student","farmer","salary","lakh",
-                            "sc","st","obc","general","ews","sebc","male","female","gender",
-                            "unemployed","bpl","disabled","nt","dnt","minority","caste","category"]
+        profile_keywords = [
+            "age","income","occupation","student","farmer","salary","lakh","rupee",
+            "sc","st","obc","general","ews","sebc","male","female","gender","woman","man",
+            "unemployed","bpl","disabled","nt","dnt","minority","caste","category",
+            "year","old","gujarat","maharashtra","rajasthan","delhi","karnataka",
+            "self","employed","business","service","retired","widow","married"
+        ]
         q = question.lower()
-        if sum(1 for kw in profile_keywords if kw in q) >= 1:
+        if any(kw in q for kw in profile_keywords):
+            return "eligibility_check"
+        if re.search(r'\b\d+\b', q):
             return "eligibility_check"
 
-    # Hard keyword pre-check — catch eligibility intent before LLM
     q = question.lower()
     eligibility_trigger_phrases = [
         "eligible for", "am i eligible", "which scheme can i", "qualify for",
@@ -244,6 +281,8 @@ def detect_intent(question: str, chat_history: list, awaiting_profile: bool) -> 
         "match my profile", "based on my profile", "for my profile",
         "new schemes i am eligible", "other schemes i am eligible",
         "find eligible", "show eligible", "eligible schemes",
+        "which scheme am i", "what schemes am i", "schemes i can",
+        "schemes i qualify", "i am eligible", "i qualify",
     ]
     if any(phrase in q for phrase in eligibility_trigger_phrases):
         return "eligibility_for_shown"
@@ -262,7 +301,7 @@ New user message: "{question}"
 
 Classify the intent into EXACTLY one of these:
 - eligibility_check     → user provides personal details (age, income, occupation, state, caste/category etc.) to find matching schemes
-- eligibility_for_shown → user asks about eligibility for schemes, shown or new (e.g. "which one am I eligible for?", "give me new schemes I am eligible for", "find schemes I qualify for", "show me eligible schemes", "find other eligible schemes", "which schemes can I apply for")
+- eligibility_for_shown → user asks about eligibility for schemes (e.g. "which scheme am I eligible for?", "which one am I eligible for?", "give me new schemes I am eligible for", "find schemes I qualify for", "show me eligible schemes", "which schemes can I apply for")
 - names_only            → user wants only a list of scheme names WITHOUT eligibility filtering
 - full_detail           → user wants complete details of scheme(s)
 - specific_field        → user wants one specific field (eligibility, benefits, link, documents, etc.)
@@ -270,16 +309,15 @@ Classify the intent into EXACTLY one of these:
 
 Reply with ONLY the intent label, nothing else.
 """
-    return llm.invoke(intent_prompt).content.strip().lower()
+    return get_llm().invoke(intent_prompt).content.strip().lower()
 
 def detect_field(question: str) -> str:
-    r = llm.invoke(f"""The user asked: "{question}"
+    r = get_llm().invoke(f"""The user asked: "{question}"
 Which ONE field? Reply ONLY with the field name from:
 scheme_name, description, category, benefits, eligibility, documents_required, application_process, state, official_link""")
     return r.content.strip().lower()
 
 def is_fresh_search_request(question: str) -> bool:
-    """Detect when user explicitly wants NEW/DIFFERENT results, not cached ones."""
     q = question.lower()
     fresh_hints = [
         "other", "different", "new", "another", "more schemes",
@@ -290,7 +328,6 @@ def is_fresh_search_request(question: str) -> bool:
     return any(h in q for h in fresh_hints)
 
 def extract_gender_from_question(question: str) -> str | None:
-    """Detect gender hint from natural language e.g. 'women scheme', 'male farmer'."""
     q = question.lower()
     female_hints = ["woman", "women", "female", "girl", "mahila", "lady", "ladies"]
     male_hints   = ["man", "men", "male", "boy", "gents", "gentleman", "purush"]
@@ -301,64 +338,112 @@ def extract_gender_from_question(question: str) -> str | None:
     return None
 
 def merge_gender_into_profile(profile: "UserProfile", gender: str | None) -> "UserProfile":
-    """Return a copy of profile with gender filled in if not already set."""
     if gender and not profile.gender:
         return profile.model_copy(update={"gender": gender})
     return profile
 
 def is_followup_on_previous(question: str, chat_history: list, last_schemes: list = None) -> bool:
-    if not chat_history: return False
-    # If user wants fresh/new results, never treat as followup
-    if is_fresh_search_request(question): return False
+    """
+    Returns True ONLY when the user is clearly asking about a scheme that was
+    already shown — NOT when they are searching for a completely new topic.
 
-    q = question.lower()
+    Rule: a followup requires an EXPLICIT reference signal:
+      1. An ordinal word/number ("first", "2nd", "give me details of 3")
+      2. A short pronoun sentence ("tell me about it", "what is that") ≤ 5 words
+      3. The user typed a significant portion of an EXACT previously shown scheme name
 
-    # Ordinal / number hints → always a followup reference
-    ordinal_hints = [
+    Anything else = fresh search = return False.
+    This prevents "disabled people schemes" from being treated as a followup
+    to "farmer schemes" just because both contain the word "scheme".
+    """
+    if not chat_history:
+        return False
+    if is_fresh_search_request(question):
+        return False
+
+    q = question.lower().strip()
+
+    # ── Signal 1: explicit ordinal words ─────────────────────────────────────
+    ORDINALS = [
         "first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth",
         "1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th",
-        "that","it","this","above","those","same","previous","last","shown","these"
     ]
-    if any(h in q for h in ordinal_hints):
+    if any(re.search(rf'\b{o}\b', q) for o in ORDINALS):
         return True
 
-    # Plain number reference like "give me detail of 3"
-    if re.search(r'\b\d{1,2}\b', q):
+    # Plain digit reference: "give me detail of 3" / "number 2"
+    if re.search(r'\b(number|no\.?|#)\s*\d{1,2}\b', q):
         return True
 
-    # Check if any significant word from question partially matches a scheme name
+    # ── Signal 2: short pronoun-only sentence ────────────────────────────────
+    # "tell me about it" / "what is that" / "show me this"
+    PRONOUNS = [r'\bit\b', r'\bthis one\b', r'\bthat one\b', r'\bthe above\b']
+    if any(re.search(p, q) for p in PRONOUNS) and len(q.split()) <= 6:
+        return True
+
+    # ── Signal 3: user typed a significant chunk of an exact scheme name ─────
+    # Require the question to contain ≥ 3 consecutive significant words from
+    # a previously shown scheme name, OR ≥ 60% of the scheme's significant words.
+    # This is strict enough to avoid false positives on generic words.
     if last_schemes:
-        STOP = {"the","a","an","of","for","in","and","or","to","is","me","my",
-                "give","show","tell","about","what","scheme","details","detail",
-                "full","please","get","find","i","want","its","this","that"}
+        STOP = {
+            "the","a","an","of","for","in","and","or","to","is","me","my","by",
+            "give","show","tell","about","what","scheme","schemes","details","detail",
+            "full","please","get","find","i","want","its","government","india",
+            "national","pradhan","mantri","yojana","rajya","gujarat","welfare",
+            "under","from","with","also","only","more","any","all","new",
+        }
         q_words = [w for w in re.findall(r'\b\w+\b', q) if len(w) > 3 and w not in STOP]
-        for s in last_schemes:
-            name = (s.scheme_name if hasattr(s, "scheme_name") else s.get("scheme_name","")).lower()
-            if any(w in name for w in q_words):
-                return True
+        if q_words:
+            for s in last_schemes:
+                name = (s.scheme_name if hasattr(s, "scheme_name") else s.get("scheme_name", "")).lower()
+                name_words = [w for w in re.findall(r'\b\w+\b', name) if len(w) > 3 and w not in STOP]
+                if not name_words:
+                    continue
+                matched = [w for w in q_words if w in name_words]
+                # Must match ≥ 60% of the scheme's significant name words
+                if len(matched) / len(name_words) >= 0.6 and len(matched) >= 2:
+                    return True
 
     return False
 
 def rewrite_question(question: str, chat_history: list) -> str:
-    if not chat_history: return question
+    """
+    Rewrites a follow-up question into a standalone search query.
+    Only calls the LLM when there is a genuine back-reference signal.
+    Fresh topic queries are returned as-is — no LLM, no context pollution.
+    """
+    if not chat_history:
+        return question
+
+    q = question.lower().strip()
+
+    # If the question contains a clear back-reference signal, rewrite with history
+    BACKREF_SIGNALS = [
+        r'\bit\b', r'\bthis one\b', r'\bthat one\b', r'\bthe above\b',
+        r'\bprevious\b', r'\bsame scheme\b',
+        r'\b1st\b', r'\b2nd\b', r'\b3rd\b', r'\b4th\b', r'\b5th\b',
+        r'\bfirst\b', r'\bsecond\b', r'\bthird\b',
+    ]
+    has_backref = any(re.search(p, q) for p in BACKREF_SIGNALS)
+
+    if not has_backref:
+        # No back-reference → fresh topic → return as-is
+        return question
+
+    # Has back-reference → rewrite using conversation history
     history_text = "\n".join([
         f"{'User' if isinstance(m, HumanMessage) else 'AI'}: {m.content}"
-        for m in chat_history[-6:]
+        for m in chat_history[-4:]
     ])
-    r = llm.invoke(f"Rewrite as standalone search query.\n\nConversation:\n{history_text}\n\nFollow-up: {question}\n\nStandalone query:")
+    r = get_llm().invoke(
+        f"Rewrite as standalone search query.\n\n"
+        f"Conversation:\n{history_text}\n\n"
+        f"Follow-up: {question}\n\nStandalone query:"
+    )
     return r.content.strip()
 
 def resolve_scheme_reference(question: str, schemes: list) -> list:
-    """
-    Resolve which scheme(s) the user is referring to.
-    Handles:
-      - Ordinal words: first, second, third... tenth
-      - Ordinal numbers: 1st, 2nd, 3rd... 10th
-      - Plain numbers: "scheme 3", "number 5", "3rd one"
-      - Partial name match: user types part of a scheme name
-      - Works with both SchemeOutput objects and plain dicts
-    Returns a list with the single matched scheme, or all schemes if no match found.
-    """
     if not schemes:
         return schemes
 
@@ -367,7 +452,6 @@ def resolve_scheme_reference(question: str, schemes: list) -> list:
 
     q = question.lower().strip()
 
-    # ── 1. Ordinal word / number match ──────────────────────────────────────
     ORDINALS = {
         "first": 0,  "1st": 0,  "one": 0,
         "second": 1, "2nd": 1,  "two": 1,
@@ -384,18 +468,14 @@ def resolve_scheme_reference(question: str, schemes: list) -> list:
         if re.search(rf'\b{re.escape(word)}\b', q) and idx < len(schemes):
             return [schemes[idx]]
 
-    # Plain digit: "scheme 3", "number 3", "3rd", "#3"
     m = re.search(r'\b(\d{1,2})\b', q)
     if m:
-        idx = int(m.group(1)) - 1          # convert 1-based to 0-based
+        idx = int(m.group(1)) - 1
         if 0 <= idx < len(schemes):
             return [schemes[idx]]
 
-    # ── 2. Partial name match ────────────────────────────────────────────────
-    # Score each scheme name by how many words from the question appear in it
     def name_score(name: str) -> float:
         name_lower = name.lower()
-        # Split question into significant words (length > 2, skip common filler)
         STOP = {"the","a","an","of","for","in","and","or","to","is","me","my",
                 "give","show","tell","about","what","scheme","details","detail",
                 "full","please","get","find","i","want","its","this","that"}
@@ -408,18 +488,16 @@ def resolve_scheme_reference(question: str, schemes: list) -> list:
     scored = [(name_score(get_name(s)), s) for s in schemes]
     best_score, best_scheme = max(scored, key=lambda x: x[0])
 
-    # Only return the match if at least 30% of significant question words matched
     if best_score >= 0.30:
         return [best_scheme]
 
-    # No match found → return all schemes unchanged
     return schemes
 
 # -------------------------------------------------
 # Extraction system prompt
 # -------------------------------------------------
 
-EXTRACTION_SYSTEM = """You are an AI assistant for Indian government schemes.
+EXTRACTION_SYSTEM = """You are an AI assistant for Gujarat government schemes.
 
 Map document fields as follows:
   "Scheme name"         → scheme_name
@@ -439,19 +517,12 @@ Rules: Extract EVERY scheme. Copy values EXACTLY. Only use 'Not Available' if tr
 # -------------------------------------------------
 
 def extract_specific_scheme_name(question: str, last_schemes: list) -> str | None:
-    """
-    Check if user is asking about a specific scheme by name.
-    First checks against previously shown schemes, then looks for long quoted/named phrases.
-    """
     q_lower = question.lower()
-
-    # Match against previously shown scheme names
     for scheme in last_schemes:
         name = scheme.scheme_name if hasattr(scheme, "scheme_name") else scheme.get("scheme_name", "")
         if name and name.lower() in q_lower:
             return name
 
-    # Detect trigger phrases like "details of X", "about X", "tell me about X"
     import re as _re
     patterns = [
         r"(?:full details of|details of|tell me about|info(?:rmation)? (?:about|on)|explain|describe|what is)\s+(.+?)(?:\s*\??\s*$)",
@@ -464,8 +535,6 @@ def extract_specific_scheme_name(question: str, last_schemes: list) -> str | Non
             if len(candidate) > 8:
                 return candidate
 
-    # If the whole question looks like a bare scheme name (from is_direct_scheme_name_query),
-    # use the entire question as the scheme name to search for
     if is_direct_scheme_name_query(question):
         return question.strip()
 
@@ -473,7 +542,6 @@ def extract_specific_scheme_name(question: str, last_schemes: list) -> str | Non
 
 
 def scheme_name_similarity(name_a: str, name_b: str) -> float:
-    """Return fraction of significant words from name_a that appear in name_b."""
     a_words = [w.lower() for w in name_a.split() if len(w) > 3]
     if not a_words:
         return 0.0
@@ -482,47 +550,58 @@ def scheme_name_similarity(name_a: str, name_b: str) -> float:
 
 
 def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: list = None) -> List[SchemeOutput]:
-    standalone = rewrite_question(question, chat_history)
-
-    # Detect if user is asking about ONE specific scheme
+    """
+    Fetches schemes from vector DB.
+    rewrite_question + DB search run in PARALLEL — saves ~6s when rewrite needs LLM.
+    For fresh topic queries, rewrite returns instantly (no LLM), so no waiting.
+    """
     specific_name = extract_specific_scheme_name(question, last_schemes or [])
+    search_query  = specific_name if specific_name else question
 
-    if specific_name:
-        # Search with higher k so we have better chance of finding the right doc
-        docs = vector_db.as_retriever(search_kwargs={"k": 5}).invoke(specific_name)
-    else:
-        docs = vector_db.as_retriever(search_kwargs={"k": k}).invoke(standalone)
+    # Run rewrite + initial DB search in parallel
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        rewrite_future = ex.submit(rewrite_question, question, chat_history)
+        db_future      = ex.submit(
+            lambda q=search_query, _k=5 if specific_name else k:
+                get_vector_db().as_retriever(search_kwargs={"k": _k}).invoke(q)
+        )
+
+    standalone = rewrite_future.result()
+    docs       = db_future.result()
+
+    # If rewrite actually changed the query, re-run DB search with the better query
+    if not specific_name and standalone.lower().strip() != question.lower().strip():
+        docs = get_vector_db().as_retriever(search_kwargs={"k": k}).invoke(standalone)
 
     context = format_docs(docs)
 
     system = EXTRACTION_SYSTEM
     if specific_name:
-        system += f'\n\nCRITICAL: The user is asking about ONLY this ONE specific scheme: "{specific_name}". Extract ONLY that scheme and nothing else. If the exact scheme is not in the context, return the closest matching one.'
+        system += (
+            f'\n\nCRITICAL: The user is asking about ONLY this ONE specific scheme: '
+            f'"{specific_name}". Extract ONLY that scheme. If not in context, return closest match.'
+        )
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", system),
         ("placeholder", "{chat_history}"),
         ("human", "Extract ALL schemes from context. Copy values exactly.\n\nContext:\n{context}\n\nQuestion: {question}")
     ])
-    result: SchemesListOutput = (prompt | structured_llm).invoke({
+    result: SchemesListOutput = (prompt | get_structured_llm()).invoke({
         "context": context, "question": question, "chat_history": chat_history,
     })
 
-    # If specific scheme requested, strictly return only the best-matching one
     if specific_name:
         if not result.schemes:
             return []
-        # Score each extracted scheme against the requested name
         scored = sorted(
             result.schemes,
             key=lambda s: scheme_name_similarity(specific_name, s.scheme_name),
             reverse=True
         )
         best = scored[0]
-        # Only return it if it's a reasonable match (at least 30% word overlap)
         if scheme_name_similarity(specific_name, best.scheme_name) >= 0.3:
             return [best]
-        # Low confidence match — still return the single best rather than all
         return [best]
 
     return result.schemes
@@ -532,10 +611,6 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
 # -------------------------------------------------
 
 def normalize_income(income_str: str) -> str:
-    """Convert shorthand income to clear rupee amount.
-    e.g. '1.5L' → '₹1,50,000 (1.5 lakh per year)'
-         '50k'  → '₹50,000 (50k per year)'
-    """
     if not income_str:
         return income_str
     s = income_str.strip().lower().replace(",", "")
@@ -557,11 +632,10 @@ def normalize_income(income_str: str) -> str:
 
 def extract_user_profile(question: str) -> UserProfile:
     try:
-        profile = profile_llm.invoke(f"""Extract user profile from this message for government scheme eligibility.
+        profile = get_profile_llm().invoke(f"""Extract user profile from this message for government scheme eligibility.
 Message: "{question}"
 Extract: age, income, occupation, state, gender, caste_category (SC/ST/OBC/General/EWS/SEBC/NT/DNT/Minority), extra info.
 Leave null if not mentioned.""")
-        # Normalize income so LLM can compare amounts correctly
         if profile.income:
             profile.income = normalize_income(profile.income)
         return profile
@@ -572,9 +646,6 @@ Leave null if not mentioned.""")
 # Check eligibility against SPECIFIC shown schemes
 # -------------------------------------------------
 
-# ── Python-based caste eligibility checker (no LLM) ──────────────────────
-
-# User caste → all equivalent terms that match in eligibility text
 CASTE_MATCH_MAP = {
     "SC":       [r"\bsc\b", r"scheduled caste", r"harijan", r"dalit"],
     "ST":       [r"\bst\b", r"scheduled tribe", r"adivasi", r"tribal"],
@@ -603,14 +674,9 @@ OPEN_TO_ALL_TERMS = [
 ]
 
 def _re_search(pattern: str, text: str) -> bool:
-    """Case-insensitive regex search helper."""
     return bool(re.search(pattern, text, re.IGNORECASE))
 
 def python_caste_check(eligibility_text: str, user_caste: str) -> tuple:
-    """
-    Pure Python caste eligibility check using word-boundary regex — no LLM.
-    Returns (is_eligible: bool, reason: str)
-    """
     if not eligibility_text or eligibility_text.strip().lower() in (
         "not available", "not found", "", "n/a"
     ):
@@ -618,28 +684,23 @@ def python_caste_check(eligibility_text: str, user_caste: str) -> tuple:
 
     text = eligibility_text
 
-    # 1. Check if scheme is open to all
     for pattern in OPEN_TO_ALL_TERMS:
         if _re_search(pattern, text):
             return True, f"Scheme is open to all categories — {user_caste} eligible"
 
-    # 2. Get match patterns for user's caste
     user_caste_clean = (user_caste or "General").strip()
-    # Normalise common variations
     caste_key = user_caste_clean.upper()
     if caste_key in ("OBC", "SEBC", "EBC"):
-        caste_key = caste_key  # keep as-is, all map correctly
+        caste_key = caste_key
     match_patterns = CASTE_MATCH_MAP.get(
         caste_key,
         [rf"\b{re.escape(user_caste_clean.lower())}\b"]
     )
 
-    # 3. Check if user's caste pattern appears in eligibility
     for pattern in match_patterns:
         if _re_search(pattern, text):
             return True, f"{user_caste_clean} matches scheme eligibility criteria"
 
-    # 4. Check if eligibility restricts to a DIFFERENT caste group
     all_other_patterns = []
     for caste, patterns in CASTE_MATCH_MAP.items():
         if caste.upper() != caste_key:
@@ -647,17 +708,15 @@ def python_caste_check(eligibility_text: str, user_caste: str) -> tuple:
 
     found_other = [p for p in all_other_patterns if _re_search(p, text)]
     if found_other:
-        # Strip regex syntax for display
         display = re.sub(r'\\b|\\', '', found_other[0]).strip()
         return False, f"Scheme restricted to {display} category — {user_caste_clean} not eligible"
 
-    # 5. No caste info found → assume open
     return True, "No specific caste restriction — assumed open to all"
 
 
 GENDER_FEMALE_PATTERNS = [
     r"\bwomen\b", r"\bwoman\b", r"\bfemale\b", r"\bgirl\b",
-    r"\bmahila\b", r"\blady\b", r"\bladies\b",
+    r"\bmahila\b", r"\blady\b", r"\bladies\b", r"\bstree\b"
 ]
 GENDER_MALE_PATTERNS = [
     r"\bmen\b", r"\bman\b", r"\bmale\b", r"\bboy\b",
@@ -665,10 +724,6 @@ GENDER_MALE_PATTERNS = [
 ]
 
 def python_gender_check(eligibility_text: str, user_gender: str | None) -> tuple:
-    """
-    Pure Python gender eligibility check.
-    Returns (is_eligible: bool, reason: str)
-    """
     if not user_gender:
         return True, "No gender specified — skipping gender check"
 
@@ -683,77 +738,64 @@ def python_gender_check(eligibility_text: str, user_gender: str | None) -> tuple
     has_female_restriction = any(_re_search(p, text) for p in GENDER_FEMALE_PATTERNS)
     has_male_restriction   = any(_re_search(p, text) for p in GENDER_MALE_PATTERNS)
 
-    # Scheme has no gender restriction at all → open to all
     if not has_female_restriction and not has_male_restriction:
         return True, "No gender restriction — open to all"
 
-    # Scheme is for women only
     if has_female_restriction and not has_male_restriction:
         if is_female:
             return True, "Scheme is for women — user is Female ✓"
         return False, "Scheme is for women only — user is not Female"
 
-    # Scheme is for men only
     if has_male_restriction and not has_female_restriction:
         if is_male:
             return True, "Scheme is for men — user is Male ✓"
         return False, "Scheme is for men only — user is not Male"
 
-    # Both genders mentioned → open to all
     return True, "Scheme is open to all genders"
 
 
 def check_eligibility_for_schemes(profile: UserProfile, schemes: List[SchemeOutput]) -> List[dict]:
-    """
-    Check eligibility:
-      Step 1 — Python caste check (word-boundary regex, 100% reliable)
-      Step 2 — Python gender check (word-boundary regex, 100% reliable)
-      Step 3 — LLM checks ONLY age / income / state / occupation
-    """
     user_caste  = (profile.caste_category or "General").strip()
     user_gender = (profile.gender or "").strip() or None
-    results     = []
 
-    # Caste keyword patterns for stripping — use word boundaries to avoid "sc" in "assistance"
     CASTE_STRIP_PATTERNS = [
         r"\bcaste\b", r"\bcategory\b", r"\b(sc|st|obc|sebc|ebc|ews|nt|dnt)\b",
         r"unreserved", r"reserved", r"backward", r"scheduled",
         r"\bminority\b", r"nomadic", r"tribal",
     ]
 
+    needs_llm    = []
+    fast_results = {}
+
     for scheme in schemes:
-        # ── Step 1: Caste check ──────────────────────────────────────────────
         caste_ok, caste_reason = python_caste_check(scheme.eligibility, user_caste)
         if not caste_ok:
-            results.append({
-                "scheme_name": scheme.scheme_name,
-                "state": scheme.state,
-                "official_link": scheme.official_link,
-                "is_eligible": False,
-                "reason": caste_reason,
-            })
+            fast_results[scheme.scheme_name] = {
+                "scheme_name": scheme.scheme_name, "category": scheme.category,
+                "state": scheme.state, "official_link": scheme.official_link,
+                "is_eligible": False, "reason": caste_reason,
+            }
             continue
 
-        # ── Step 2: Gender check ─────────────────────────────────────────────
         gender_ok, gender_reason = python_gender_check(scheme.eligibility, user_gender)
         if not gender_ok:
-            results.append({
-                "scheme_name": scheme.scheme_name,
-                "state": scheme.state,
-                "official_link": scheme.official_link,
-                "is_eligible": False,
-                "reason": gender_reason,
-            })
+            fast_results[scheme.scheme_name] = {
+                "scheme_name": scheme.scheme_name, "category": scheme.category,
+                "state": scheme.state, "official_link": scheme.official_link,
+                "is_eligible": False, "reason": gender_reason,
+            }
             continue
 
-        # ── Step 3: LLM checks ONLY age / income / state / occupation ────────
-        profile_text = profile_to_text(profile)
+        needs_llm.append((scheme, caste_reason, gender_reason))
 
-        # Strip caste AND gender lines from eligibility to avoid LLM re-checking them
+    profile_text = profile_to_text(profile)
+
+    def _llm_check_one(args):
+        scheme, caste_reason, gender_reason = args
         eligibility_lines = scheme.eligibility.split(".") if scheme.eligibility else []
         non_caste_gender_lines = []
         for line in eligibility_lines:
-            has_caste = any(_re_search(p, line) for p in CASTE_STRIP_PATTERNS)
+            has_caste  = any(_re_search(p, line) for p in CASTE_STRIP_PATTERNS)
             has_gender = any(_re_search(p, line) for p in GENDER_FEMALE_PATTERNS + GENDER_MALE_PATTERNS)
             if not has_caste and not has_gender:
                 non_caste_gender_lines.append(line)
@@ -778,34 +820,54 @@ Reply with ONLY one of:
 PASS: <brief reason about age/income/state/occupation>
 FAIL: <specific criterion that failed — age/income/state/occupation only>"""
 
-        r = llm.invoke(prompt)
+        r = get_llm().invoke(prompt)
         answer = r.content.strip()
 
         if answer.upper().startswith("PASS"):
             detail = answer.split(":", 1)[-1].strip() if ":" in answer else "Meets all criteria"
-            # Build a clean combined reason
             parts = []
             if user_gender and gender_reason and "No gender" not in gender_reason:
                 parts.append(gender_reason)
             if caste_reason and "No specific" not in caste_reason and "assumed" not in caste_reason:
                 parts.append(caste_reason)
             parts.append(detail)
-            results.append({
-                "scheme_name": scheme.scheme_name,
-                "state": scheme.state,
-                "official_link": scheme.official_link,
+            return scheme.scheme_name, {
+                "scheme_name": scheme.scheme_name, "category": scheme.category,
+                "state": scheme.state, "official_link": scheme.official_link,
                 "is_eligible": True,
                 "reason": ". ".join(p for p in parts if p),
-            })
+            }
         else:
             detail = answer.split(":", 1)[-1].strip() if ":" in answer else answer
-            results.append({
-                "scheme_name": scheme.scheme_name,
-                "state": scheme.state,
-                "official_link": scheme.official_link,
-                "is_eligible": False,
-                "reason": detail,
-            })
+            return scheme.scheme_name, {
+                "scheme_name": scheme.scheme_name, "category": scheme.category,
+                "state": scheme.state, "official_link": scheme.official_link,
+                "is_eligible": False, "reason": detail,
+            }
+
+    llm_results = {}
+    if needs_llm:
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(_llm_check_one, args): args for args in needs_llm}
+            for future in as_completed(futures):
+                try:
+                    name, result = future.result()
+                    llm_results[name] = result
+                except Exception as e:
+                    scheme = futures[future][0]
+                    print(f"[eligibility] LLM check failed for {scheme.scheme_name}: {e}")
+                    llm_results[scheme.scheme_name] = {
+                        "scheme_name": scheme.scheme_name, "category": scheme.category,
+                        "state": scheme.state, "official_link": scheme.official_link,
+                        "is_eligible": True, "reason": "Could not verify — assuming eligible",
+                    }
+
+    results = []
+    for scheme in schemes:
+        if scheme.scheme_name in fast_results:
+            results.append(fast_results[scheme.scheme_name])
+        elif scheme.scheme_name in llm_results:
+            results.append(llm_results[scheme.scheme_name])
 
     return results
 
@@ -815,10 +877,9 @@ FAIL: <specific criterion that failed — age/income/state/occupation only>"""
 # -------------------------------------------------
 
 def fetch_eligible_schemes(profile: UserProfile, k: int = 10) -> List[dict]:
-    # Build a targeted search query that includes gender so vector DB returns relevant docs
     parts = []
     if profile.gender:
-        parts.append(profile.gender.lower())   # "female" / "male" → pulls women/men schemes
+        parts.append(profile.gender.lower())
     if profile.occupation:
         parts.append(profile.occupation)
     if profile.state:
@@ -830,70 +891,56 @@ def fetch_eligible_schemes(profile: UserProfile, k: int = 10) -> List[dict]:
     if profile.income:
         parts.append(f"income {profile.income}")
     if not parts:
-        parts = ["government scheme"]
+        parts = ["government scheme eligibility"]
+
+    def _extract_and_check(fetch_k: int, query: str) -> List[dict]:
+        docs = get_vector_db().as_retriever(search_kwargs={"k": fetch_k}).invoke(query)
+        if not docs:
+            print(f"[fetch_eligible] No docs returned for query: {query}")
+            return []
+
+        print(f"[fetch_eligible] Got {len(docs)} docs, extracting schemes...")
+        context = format_docs(docs)
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", EXTRACTION_SYSTEM),
+            ("human", "Extract ALL schemes from context. Copy values exactly.\n\nContext:\n{context}\n\nQuestion: find eligible schemes")
+        ])
+        try:
+            result: SchemesListOutput = (prompt | get_structured_llm()).invoke({"context": context})
+            candidate_schemes = result.schemes
+        except Exception as e:
+            print(f"[fetch_eligible] Extraction failed: {e}")
+            return []
+
+        print(f"[fetch_eligible] Extracted {len(candidate_schemes)} candidate schemes, checking eligibility...")
+
+        if not candidate_schemes:
+            return []
+
+        strict_results = check_eligibility_for_schemes(profile, candidate_schemes)
+        eligible = [
+            {
+                "scheme_name":   r["scheme_name"],
+                "category":      r.get("category", ""),
+                "state":         r.get("state", ""),
+                "official_link": r.get("official_link", ""),
+                "why_eligible":  r.get("reason", "Meets all eligibility criteria"),
+            }
+            for r in strict_results if r.get("is_eligible")
+        ]
+        print(f"[fetch_eligible] {len(eligible)} schemes passed strict check.")
+        return eligible
 
     query = " ".join(parts) + " eligibility scheme"
-    docs = vector_db.as_retriever(search_kwargs={"k": k}).invoke(query)
-    context = format_docs(docs)
-    profile_text = profile_to_text(profile)
+    eligible = _extract_and_check(fetch_k=15, query=query)
 
-    # Build gender instruction for LLM
-    gender_rule = ""
-    if profile.gender:
-        g = profile.gender.strip().lower()
-        is_female = g in ("female", "woman", "women", "girl", "mahila")
-        is_male   = g in ("male", "man", "men", "boy")
-        if is_female:
-            gender_rule = """
-GENDER RULES:
-- Include schemes that are specifically for women/females/mahila.
-- Include schemes open to all genders (no gender restriction).
-- EXCLUDE schemes that are explicitly for men/males only."""
-        elif is_male:
-            gender_rule = """
-GENDER RULES:
-- Include schemes that are specifically for men/males.
-- Include schemes open to all genders (no gender restriction).
-- EXCLUDE schemes that are explicitly for women/females only."""
-    else:
-        gender_rule = "\nGENDER: No gender specified — include all schemes regardless of gender."
+    if not eligible:
+        print("[fetch_eligible] First pass empty, trying broader search...")
+        broad_query = (profile.state or "Gujarat") + " government scheme eligibility"
+        eligible = _extract_and_check(fetch_k=20, query=broad_query)
 
-    r = llm.invoke(f"""You are an Indian government scheme eligibility expert.
-
-CRITICAL CASTE/CATEGORY RULES:
-1. "Unreserved", "General", "Open", "Non-reserved", "All categories" = OPEN TO EVERYONE. Do NOT reject SC/ST/OBC/EWS users.
-2. "SC only" = only SC eligible. "ST only" = only ST eligible.
-3. "OBC" or "SEBC" or "EBC" = OBC/SEBC users ARE eligible.
-4. "Minority" = only minority community eligible.
-5. No caste restriction mentioned = open to all categories.
-6. NEVER reject an OBC/SC/ST applicant from a "General/Unreserved/Open" scheme.
-{gender_rule}
-
-USER PROFILE:
-{profile_text}
-
-AVAILABLE SCHEMES:
-{context}
-
-Return ONLY schemes where this user clearly qualifies based on ALL criteria (caste, gender, age, income, occupation, state).
-
-Return ONLY this JSON array (no markdown, no extra text):
-[
-  {{
-    "scheme_name": "...",
-    "category": "...",
-    "state": "...",
-    "official_link": "...",
-    "why_eligible": "Specific reason mentioning matched criteria (gender, caste, age etc.)"
-  }}
-]""")
-
-    raw = re.sub(r"```json|```", "", r.content.strip()).strip()
-    try:
-        result = json.loads(raw)
-        return result if isinstance(result, list) else []
-    except Exception:
-        return []
+    return eligible
 
 # -------------------------------------------------
 # Conversational reply
@@ -909,7 +956,7 @@ def conversational_reply(question: str, chat_history: list, lang: str = "en") ->
         "gu": "Always reply in Gujarati (Gujarati script).",
         "en": "Reply in English.",
     }.get(lang, "Reply in English.")
-    r = llm.invoke(f"""You are a helpful Indian government scheme assistant.
+    r = get_llm().invoke(f"""You are a helpful Gujarat government scheme assistant.
 {lang_instruction}
 Help users find schemes and check eligibility.
 
@@ -924,33 +971,42 @@ AI:""")
 # Main ask function
 # -------------------------------------------------
 
-def ask_agent(question: str, session_id: str = "user_1"):
+def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
     session = get_session(session_id)
     chat_history = session["history"]
     awaiting_profile = session.get("awaiting_profile", False)
 
-    # ── Language detection ───────────────────────────────────────────────────
-    lang = detect_language(question)
-    # Persist language — once user speaks Hindi/Gujarati keep it unless they switch
-    if lang != "en" or session.get("lang", "en") == "en":
-        session["lang"] = lang
-    lang = session["lang"]
+    # ── Language detection ──────────────────────────────────────────────────
+    detected = detect_language(question)
+    if detected != "en":
+        lang = detected
+    elif ui_lang and ui_lang in ("en", "hi", "gu"):
+        lang = ui_lang
+    else:
+        lang = session.get("lang", "en")
+    session["lang"] = lang
 
-    # Translate question to English for all internal processing
-    question_en = translate_to_english(question, lang)
-
-    # Helper: translate a reply string back to user's language
     def reply_in_lang(text: str) -> str:
         return translate_response(text, lang)
 
-    # Shortcut to get localised static strings
     def ls(key: str) -> str:
         return get_string(key, lang)
 
     PROFILE_REQUEST = ls("profile_request")
-
     awaiting_profile = session.get("awaiting_profile", False)
-    intent = detect_intent(question_en, chat_history, awaiting_profile)
+
+    # ── ✅ PARALLEL: translate + detect intent at the same time ─────────────
+    # For English: translate is a no-op so both run truly in parallel.
+    # For non-English: translate first (1 LLM call), then intent on English text.
+    if lang == "en":
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            t_future = executor.submit(translate_to_english, question, lang)
+            i_future = executor.submit(detect_intent, question, chat_history, awaiting_profile)
+        question_en = t_future.result()
+        intent = i_future.result()
+    else:
+        question_en = translate_to_english(question, lang)
+        intent = detect_intent(question_en, chat_history, awaiting_profile)
 
     # ── User provided their profile ─────────────────────────────────────────
     if intent == "eligibility_check":
@@ -958,17 +1014,44 @@ def ask_agent(question: str, session_id: str = "user_1"):
         gender_hint = extract_gender_from_question(question_en)
         profile = merge_gender_into_profile(profile, gender_hint)
         session["user_profile"] = profile
+        session["awaiting_profile"] = False
 
         if awaiting_profile and session.get("last_schemes"):
-            session["awaiting_profile"] = False
-            print(ls("searching_shown") if "searching_shown" in LANG_STRINGS["en"] else "🔍 Checking...")
-            results = check_eligibility_for_schemes(profile, session["last_schemes"])
-            save_to_history(session_id, question, f"Checked eligibility for {len(session['last_schemes'])} schemes.")
-            return {"type": "eligibility_for_shown", "profile": profile.model_dump(), "schemes": results, "lang": lang}
+            last = session["last_schemes"]
+            scheme_objects = []
+            for s in last:
+                if isinstance(s, SchemeOutput):
+                    scheme_objects.append(s)
+                else:
+                    name = s.get("scheme_name", "")
+                    if name:
+                        fetched = fetch_schemes(name, [], k=3, last_schemes=[])
+                        if fetched:
+                            scheme_objects.append(fetched[0])
+                        else:
+                            scheme_objects.append(SchemeOutput(
+                                scheme_name=name,
+                                description="", category=s.get("category", ""),
+                                benefits="", eligibility="",
+                                documents_required="", application_process="",
+                                state=s.get("state", ""),
+                                official_link=s.get("official_link", "")
+                            ))
+            if scheme_objects:
+                print("🔍 Checking eligibility for shown schemes...")
+                results = check_eligibility_for_schemes(profile, scheme_objects)
+                save_to_history(session_id, question, f"Checked eligibility for {len(scheme_objects)} schemes.")
+                return {"type": "eligibility_for_shown", "profile": profile.model_dump(), "schemes": results, "lang": lang}
 
-        session["awaiting_profile"] = False
-        print("🔍 Checking eligibility across all schemes...")
-        eligible = fetch_eligible_schemes(profile, k=10)
+        # No prior shown schemes OR scheme_objects came out empty → search full DB
+        print("🔍 No prior schemes found — searching full DB for eligibility...")
+        try:
+            eligible = fetch_eligible_schemes(profile, k=10)
+        except Exception as e:
+            print(f"[eligibility_check] fetch_eligible_schemes error: {e}")
+            reply = reply_in_lang("Sorry, something went wrong while checking eligibility. Please try again.")
+            save_to_history(session_id, question, reply)
+            return {"type": "conversational", "reply": reply, "lang": lang}
 
         if not eligible:
             reply = reply_in_lang(ls("no_schemes_found"))
@@ -984,12 +1067,25 @@ def ask_agent(question: str, session_id: str = "user_1"):
         last_schemes = session.get("last_schemes", [])
         gender_hint = extract_gender_from_question(question_en)
 
+        if gender_hint and not session.get("user_profile"):
+            session["user_profile"] = UserProfile(gender=gender_hint)
+        elif gender_hint and session.get("user_profile"):
+            session["user_profile"] = merge_gender_into_profile(session["user_profile"], gender_hint)
+
+        if not session.get("user_profile") or not any([
+            session["user_profile"].age,
+            session["user_profile"].income,
+            session["user_profile"].occupation,
+            session["user_profile"].caste_category,
+        ]):
+            session["awaiting_profile"] = True
+            save_to_history(session_id, question, PROFILE_REQUEST)
+            return {"type": "conversational", "reply": PROFILE_REQUEST, "lang": lang}
+
+        profile = session["user_profile"]
+
         if is_fresh_search_request(question_en):
-            if not session.get("user_profile"):
-                session["awaiting_profile"] = True
-                save_to_history(session_id, question, PROFILE_REQUEST)
-                return {"type": "conversational", "reply": PROFILE_REQUEST, "lang": lang}
-            profile = merge_gender_into_profile(session["user_profile"], gender_hint)
+            profile = merge_gender_into_profile(profile, gender_hint)
             session["user_profile"] = profile
             print("🔍 Searching all schemes for your eligibility...")
             eligible = fetch_eligible_schemes(profile, k=10)
@@ -1001,24 +1097,21 @@ def ask_agent(question: str, session_id: str = "user_1"):
             session["last_schemes"] = eligible
             return {"type": "eligibility_result", "profile": profile.model_dump(), "schemes": eligible, "lang": lang}
 
-        if not last_schemes:
-            reply = reply_in_lang(ls("ask_schemes_first"))
-            save_to_history(session_id, question, reply)
-            return {"type": "conversational", "reply": reply, "lang": lang}
-
-        if session.get("user_profile"):
-            profile = merge_gender_into_profile(session["user_profile"], gender_hint)
-            session["user_profile"] = profile
+        if last_schemes:
             print("🔍 Checking eligibility for shown schemes...")
             results = check_eligibility_for_schemes(profile, last_schemes)
             save_to_history(session_id, question, f"Checked eligibility for {len(last_schemes)} schemes.")
             return {"type": "eligibility_for_shown", "profile": profile.model_dump(), "schemes": results, "lang": lang}
 
-        if gender_hint:
-            session["user_profile"] = UserProfile(gender=gender_hint)
-        session["awaiting_profile"] = True
-        save_to_history(session_id, question, PROFILE_REQUEST)
-        return {"type": "conversational", "reply": PROFILE_REQUEST, "lang": lang}
+        print("🔍 Searching all schemes for your eligibility...")
+        eligible = fetch_eligible_schemes(profile, k=10)
+        if not eligible:
+            reply = reply_in_lang(ls("no_schemes_found"))
+            save_to_history(session_id, question, reply)
+            return {"type": "conversational", "reply": reply, "lang": lang}
+        save_to_history(session_id, question, f"Found {len(eligible)} eligible schemes.")
+        session["last_schemes"] = eligible
+        return {"type": "eligibility_result", "profile": profile.model_dump(), "schemes": eligible, "lang": lang}
 
     # ── Normal scheme queries ────────────────────────────────────────────────
     session["awaiting_profile"] = False
@@ -1081,8 +1174,7 @@ def ask_agent(question: str, session_id: str = "user_1"):
         save_to_history(session_id, question, reply)
         return {"type": "conversational", "reply": reply, "lang": lang}
 
-    # full_detail — scheme card fields stay in English (original DB language)
-    # but we add lang so UI can label fields in the right language
+    # full_detail
     selected = schemes[:limit] if limit else schemes
     save_to_history(session_id, question, f"Showed details for: {', '.join(s.scheme_name for s in selected)}")
     return {
