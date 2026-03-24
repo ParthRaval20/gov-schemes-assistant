@@ -1408,12 +1408,14 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
         save_to_history(session_id, question, reply)
 
         # Stream names as text tokens (ChatGPT-style)
+        import time
         yield {"type": "conversational_start", "lang": lang}
         # Split into small chunks for typing effect
         words = reply.split(" ")
         for i, word in enumerate(words):
             chunk = word if i == 0 else " " + word
             yield {"type": "chunk", "text": chunk}
+            time.sleep(0.02)  # Simulate actual typing speed
         yield {"type": "conversational_end"}
         return
 

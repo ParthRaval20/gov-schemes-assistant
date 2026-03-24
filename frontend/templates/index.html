@@ -772,14 +772,16 @@ function renderResult(result) {
 
   const avatar = `<div class="avatar ai">🤖</div>`;
   let content = '';
+  let attachSpeak = null;
 
   if (result.type === 'conversational') {
     const replyText = result.reply || '';
     const speakId = 'speak-' + Date.now();
     content = `<div class="bubble ai">
       ${escapeHtml(replyText)}
-      <br><button class="speak-btn" id="${speakId}" onclick="speakText(${JSON.stringify(replyText)}, this)" data-speaking="0">🔊 Listen</button>
+      <br><button class="speak-btn" id="${speakId}" data-speaking="0">🔊 Listen</button>
     </div>`;
+    attachSpeak = { id: speakId, text: replyText };
   }
   else if (result.type === 'names_only') {
     content = `<div class="bubble ai">
@@ -871,6 +873,11 @@ function renderResult(result) {
   row.innerHTML = avatar + content;
   chat.appendChild(row);
   scrollBottom();
+
+  if (attachSpeak) {
+    const btn = row.querySelector('#' + attachSpeak.id);
+    if (btn) btn.onclick = () => speakText(attachSpeak.text, btn);
+  }
 
   // Auto-read: fires for ALL response types when toggle is ON
   if (autoReadEnabled) {
