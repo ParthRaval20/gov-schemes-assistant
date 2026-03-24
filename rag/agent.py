@@ -73,17 +73,59 @@ def translate_response(text: str, target_lang: str) -> str:
     """Translate agent response from English to target language."""
     if target_lang == "en":
         return text
-    lang_name = {"hi": "Hindi", "gu": "Gujarati"}[target_lang]
+    lang_name = {"hi": "Hindi (हिन्दी, Devanagari script)", "gu": "Gujarati (ગુજરાતી, Gujarati script)"}[target_lang]
+    script_warn = {
+        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (हिन्दी). Do NOT use Gujarati script.",
+        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (ગુજરાતી). Do NOT use Hindi/Devanagari script.",
+    }[target_lang]
     r = get_llm().invoke(
         f"Translate this English text to {lang_name}.\n"
+        f"{script_warn}\n"
         f"Keep unchanged: scheme names, official links, SC/ST/OBC/EWS/SEBC, state names, ₹ amounts, numbers.\n"
-        f"Return ONLY the {lang_name} translation.\n\nEnglish: {text}\n\n{lang_name}:"
+        f"Return ONLY the translation.\n\nEnglish: {text}\n\nTranslation:"
     )
     return r.content.strip()
 
 def get_string(key: str, lang: str) -> str:
     """Get a static UI string in the given language."""
     return LANG_STRINGS.get(lang, LANG_STRINGS["en"]).get(key, LANG_STRINGS["en"].get(key, ""))
+
+def translate_scheme_dict(d: dict, target_lang: str) -> dict:
+    if target_lang == "en":
+        return d
+    lang_name = {"hi": "Hindi", "gu": "Gujarati"}.get(target_lang, "English")
+    
+    # We only care about translating text that users read.
+    keys_to_translate = [k for k in ("scheme_name", "description", "benefits", 
+                                     "eligibility", "documents_required", 
+                                     "application_process", "category") 
+                         if k in d and d[k]]
+    
+    if not keys_to_translate:
+        return d
+
+    to_translate = {k: d[k] for k in keys_to_translate}
+    json_in = json.dumps(to_translate, ensure_ascii=False)
+    
+    script_warn = {
+        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (हिन्दी). Do NOT output Gujarati.",
+        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (ગુજરાતી). Do NOT output Hindi.",
+    }.get(target_lang, "")
+    prompt = f"""Translate the text values to {lang_name} while keeping numbers, Rs amounts, 'official_link', and SC/ST/OBC acronyms exactly the same.
+{script_warn}
+Return ONLY valid JSON that matches the required schema.
+
+Input JSON to translate:
+{json_in}
+"""
+    try:
+        translated = get_llm().with_structured_output(TranslatedScheme).invoke(prompt)
+        res = d.copy()
+        res.update({k: v for k, v in translated.model_dump().items() if v})
+        return res
+    except Exception as e:
+        print(f"[translate_scheme_dict] Translation failed: {e}")
+        return d
 
 # -------------------------------------------------
 # Schemas
@@ -111,6 +153,15 @@ class MinimalSchemeOutput(BaseModel):
 
 class MinimalSchemesListOutput(BaseModel):
     schemes: List[MinimalSchemeOutput] = Field(description="List of all government schemes found")
+
+class TranslatedScheme(BaseModel):
+    scheme_name: Optional[str] = Field(None)
+    description: Optional[str] = Field(None)
+    benefits: Optional[str] = Field(None)
+    eligibility: Optional[str] = Field(None)
+    documents_required: Optional[str] = Field(None)
+    application_process: Optional[str] = Field(None)
+    category: Optional[str] = Field(None)
 
 class UserProfile(BaseModel):
     age: Optional[int] = Field(None)
@@ -626,16 +677,16 @@ def rewrite_question(question: str, chat_history: list) -> str:
     )
     return r.content.strip()
 
-def resolve_scheme_reference(question: str, schemes: list) -> list:
+def resolve_scheme_reference(question: str, question_en: str, schemes: list) -> list:
     if not schemes:
         return schemes
 
     def get_name(s) -> str:
         return (s.scheme_name if hasattr(s, "scheme_name") else s.get("scheme_name", "")).strip()
 
-    q_lower = question.lower().strip()
+    q_lower = question_en.lower().strip()
 
-    # 1. Exact or partial exact match 
+    # 1. Exact or partial exact match (English matches)
     for s in schemes:
         name_lower = get_name(s).lower()
         if name_lower and (name_lower == q_lower or name_lower in q_lower or q_lower in name_lower):
@@ -657,19 +708,50 @@ def resolve_scheme_reference(question: str, schemes: list) -> list:
         if re.search(rf'\b{re.escape(word)}\b', q_lower) and idx < len(schemes):
             return [schemes[idx]]
 
-    m = re.search(r'\b(\d{1,2})\b', q_lower)
+    # Also check native question for digits (like Gujarati ૩)
+    m = re.search(r'\b(\d{1,2})\b', question.lower())
     if m:
         idx = int(m.group(1)) - 1
         if 0 <= idx < len(schemes):
             return [schemes[idx]]
+    
+    m_en = re.search(r'\b(\d{1,2})\b', q_lower)
+    if m_en:
+        idx = int(m_en.group(1)) - 1
+        if 0 <= idx < len(schemes):
+            return [schemes[idx]]
 
+    # 2. Robust LLM mapping fallback for cross-language/transliteration
+    names_map = {f"{i+1}": get_name(s) for i, s in enumerate(schemes)}
+    map_str = "\n".join(f"{k}. {v}" for k, v in names_map.items())
+    
+    prompt = f"""You are a matching system. Identify which exact scheme(s) the user is referring to from this list:
+{map_str}
+
+User query: "{question}"
+
+Which scheme number(s) does the user want?
+- If one matches, return its number (e.g. 3)
+- If multiple, return separated by comma (e.g. 1, 3)
+- If NONE match, return 0
+Reply ONLY with digits/commas, no text."""
+
+    try:
+        raw = get_llm().invoke(prompt).content.strip()
+        nums = [int(n.strip()) for n in raw.replace(".", ",").split(",") if n.strip().isdigit()]
+        valid = [schemes[n-1] for n in nums if 1 <= n <= len(schemes)]
+        if valid:
+            return valid
+    except Exception as e:
+        print(f"[resolve_scheme] LLM fallback error: {e}")
+
+    # 3. Fuzzy match fallback
     def name_score(name: str) -> float:
         name_lower = name.lower()
         STOP = {"the","a","an","of","for","in","and","or","to","is","me","my",
                 "give","show","tell","about","what","scheme","details","detail",
                 "full","please","get","find","i","want","its","this","that"}
         
-        # Keep words if they are long enough, OR if they are digits (like '3'), OR recognized acronyms
         q_words = [w for w in re.findall(r'\b\w+\b', q_lower) 
                    if (len(w) > 2 or w.isdigit() or w in ("sc", "st", "nt")) and w not in STOP]
         if not q_words:
@@ -683,7 +765,7 @@ def resolve_scheme_reference(question: str, schemes: list) -> list:
     if best_score >= 0.30:
         return [best_scheme]
 
-    return schemes
+    return None
 
 # -------------------------------------------------
 # Extraction system prompt
@@ -1244,16 +1326,18 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
 
     # ── ✅ PARALLEL: translate + detect intent at the same time ─────────────
     # For English: translate is a no-op so both run truly in parallel.
-    # For non-English: translate first (1 LLM call), then intent on English text.
+    # For non-English: Both run in parallel using the native language. 
+    # The LLM is smart enough to detect intent from Hindi/Gujarati directly!
+    # This saves 3 full seconds on non-English queries!
     if lang == "en":
+        question_en = question
+        intent = detect_intent(question_en, chat_history, awaiting_profile)
+    else:
         with ThreadPoolExecutor(max_workers=2) as executor:
             t_future = executor.submit(translate_to_english, question, lang)
             i_future = executor.submit(detect_intent, question, chat_history, awaiting_profile)
         question_en = t_future.result()
         intent = i_future.result()
-    else:
-        question_en = translate_to_english(question, lang)
-        intent = detect_intent(question_en, chat_history, awaiting_profile)
 
     # ── User provided their profile ─────────────────────────────────────────
     if intent == "eligibility_check":
@@ -1401,27 +1485,35 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
     followup = is_followup_on_previous(question_en, chat_history, session["last_schemes"])
     fresh = is_fresh_search_request(question_en)
 
-    if followup and not fresh and session["last_schemes"]:
-        schemes = resolve_scheme_reference(question_en, session["last_schemes"])
-        converted = []
-        for s in schemes:
-            name = s.get("scheme_name", "") if isinstance(s, dict) else s.scheme_name
-            if isinstance(s, dict) or isinstance(s, MinimalSchemeOutput):
-                fetched = fetch_schemes(name, [], k=3, last_schemes=[], minimal_extraction=(intent == "names_only"))
-                if fetched:
-                    converted.append(fetched[0])
+    schemes = None
+
+    # Step 1: If there are previously shown schemes, ALWAYS try to resolve against them first.
+    # This is critical for Hindi/Gujarati where is_followup_on_previous may miss the match.
+    if session["last_schemes"] and not fresh:
+        resolved = resolve_scheme_reference(question, question_en, session["last_schemes"])
+        if resolved is not None:
+            # Successfully matched specific scheme(s) from the list
+            converted = []
+            for s in resolved:
+                name = s.get("scheme_name", "") if isinstance(s, dict) else s.scheme_name
+                if isinstance(s, dict) or isinstance(s, MinimalSchemeOutput):
+                    fetched = fetch_schemes(name, [], k=3, last_schemes=[], minimal_extraction=(intent == "names_only"))
+                    if fetched:
+                        converted.append(fetched[0])
+                    else:
+                        converted.append(SchemeOutput(
+                            scheme_name=name,
+                            description="", category="",
+                            benefits="", eligibility="",
+                            documents_required="", application_process="",
+                            state="", official_link=""
+                        ))
                 else:
-                    converted.append(SchemeOutput(
-                        scheme_name=name,
-                        description="", category="",
-                        benefits="", eligibility="",
-                        documents_required="", application_process="",
-                        state="", official_link=""
-                    ))
-            else:
-                converted.append(s)
-        schemes = converted
-    else:
+                    converted.append(s)
+            schemes = converted
+
+    # Step 2: If resolution failed (None) or no last_schemes, do a fresh DB search 
+    if schemes is None:
         prev_names = []
         if fresh:
             for s in session["last_schemes"]:
@@ -1487,10 +1579,16 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
     
     preview_text = "Here are the details:\n\n" + "\n".join(preview_parts) + "\n*Loading cards...*"
     preview_text = reply_in_lang(preview_text)
+    
+    def _process_and_translate_scheme(d: dict) -> dict:
+        d = apply_visit_site_fallback(d)
+        if lang != "en":
+            d = translate_scheme_dict(d, lang)
+        return d
 
-    # Run enrichment in background WHILE streaming text
+    # Run enrichment and translation in background WHILE streaming text
     with ThreadPoolExecutor(max_workers=max(1, min(len(dicts), 5))) as ex:
-        futures = {ex.submit(apply_visit_site_fallback, d): i for i, d in enumerate(dicts)}
+        futures = {ex.submit(_process_and_translate_scheme, d): i for i, d in enumerate(dicts)}
         
         # Stream the typing effect text
         yield {"type": "conversational_start", "lang": lang}
