@@ -521,6 +521,40 @@
     }
     .speak-btn:hover { border-color: var(--navy); color: var(--navy); }
     .speak-btn.speaking { color: var(--green); border-color: var(--green); }
+    /* ── Structured Lists (Steps/Bullets) ── */
+    .structured-list {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .list-item {
+      position: relative;
+      padding: 8px 12px;
+      background: #fdfaf5;
+      border: 1px solid #f0e0d0;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+    .list-item.step {
+      border-left: 4px solid var(--saffron);
+    }
+    .list-item.bullet {
+      border-left: 4px solid #138808;
+    }
+    .step-marker {
+      font-weight: 700;
+      color: var(--saffron);
+      margin-right: 6px;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .bullet-marker {
+      color: var(--green);
+      font-weight: 900;
+      margin-right: 8px;
+    }
   </style>
 </head>
 <body>
@@ -593,6 +627,68 @@ const VOICE_HINT = {
   hi: { idle: 'Enter दबाएं भेजने के लिए · Shift+Enter नई लाइन के लिए', listening: '🎙️ सुन रहा हूं… बोलिए' },
   gu: { idle: 'Enter દબાવો મોકલવા માટે · Shift+Enter નવી લીટી માટે', listening: '🎙️ સાંભળું છું… બોલો' },
 };
+
+function cleanTextForSpeech(text, lang) {
+  if (!text) return "";
+  const targetLang = lang || currentLang;
+  
+  // Comprehensive Emoji & Symbol stripping
+  let cleaned = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+  
+  // Strip specific UI icons and emojis
+  cleaned = cleaned.replace(/✅|❌|📋|📌|🎯|📊|💡|🔗|☸️|🇮🇳|🤖|👤|🌾/g, '');
+  
+  // Space out common separators for natural pausing
+  cleaned = cleaned.replace(/&nbsp;/g, ' ')
+                   .replace(/<br>/g, ' . ') // add period for pause
+                   .replace(/<[^>]*>/g, '') 
+                   .replace(/([0-9])\.\s/g, '$1 . ') // space out numbered lists
+                   .replace(/([\.।\?\!])\s/g, '$1   '); // add extra space after sentences
+  
+  // Language-aware slash replacement
+  const andWord = { 'gu': ' અને ', 'hi': ' और ', 'en': ' and ' }[targetLang] || ' and ';
+  cleaned = cleaned.replace(/\//g, andWord);
+  
+  return cleaned.trim();
+}
+
+function getVoiceForLang(langCode, isFallbackAttempt = false) {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  
+  const target = langCode.toLowerCase().replace('_', '-');
+  const prefix = target.split('-')[0];
+  const langNameMap = { 'gu': 'gujarati', 'hi': 'hindi', 'en': 'english' };
+  const targetName = langNameMap[prefix];
+
+  const matches = voices.filter(v => 
+    v.lang.toLowerCase().replace('_', '-') === target || 
+    v.lang.toLowerCase().startsWith(prefix) ||
+    (targetName && v.name.toLowerCase().includes(targetName))
+  );
+
+  if (matches.length > 0) {
+    // Priority 1: High quality cloud voices (Google / Microsoft / Online)
+    const premium = matches.find(v => 
+        v.name.toLowerCase().includes('google') || 
+        v.name.toLowerCase().includes('online') || 
+        v.name.toLowerCase().includes('premium') ||
+        v.name.toLowerCase().includes('microsoft')
+    );
+    if (premium) return premium;
+    
+    // Priority 2: Local voices
+    return matches[0];
+  }
+
+  // 4. Fallback: If Gujarati requested and not found, try Hindi (once)
+  if (!isFallbackAttempt && prefix === 'gu') {
+    return getVoiceForLang('hi-IN', true);
+  }
+  
+  return null;
+}
 
 function toggleVoice() {
   if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -672,6 +768,12 @@ function toggleVoice() {
   recognition.start();
 }
 
+// Ensure voices are loaded
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+  window.speechSynthesis.getVoices();
+}
+
 // ── Text-to-Speech (AI reply read aloud) ─────────────────────────────────────
 let currentUtterance = null;
 let autoReadEnabled = false;
@@ -690,8 +792,9 @@ function toggleAutoRead() {
   }
 }
 
-function speakText(text, btn) {
+function speakText(text, btn, lang) {
   if (!window.speechSynthesis) return;
+  const targetLang = lang || currentLang;
   if (currentUtterance) {
     speechSynthesis.cancel();
     currentUtterance = null;
@@ -700,20 +803,41 @@ function speakText(text, btn) {
     });
     if (btn.dataset.speaking === '1') { btn.dataset.speaking = '0'; return; }
   }
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = VOICE_LANG[currentLang] || 'en-IN';
-  utter.rate = 0.88;
+  const cleaned = cleanTextForSpeech(text, targetLang);
+  if (!cleaned) return;
+
+  const utter = new SpeechSynthesisUtterance(cleaned);
+  const langCode = VOICE_LANG[targetLang] || 'en-IN';
+  utter.lang = langCode;
+  
+  const voice = getVoiceForLang(langCode);
+  if (voice) {
+    utter.voice = voice;
+    // If we fell back to Hindi for Gujarati, update the utter.lang so the engine works
+    if (langCode.startsWith('gu') && voice.lang.startsWith('hi')) {
+       utter.lang = 'hi-IN';
+    }
+  }
+
+  utter.rate = 0.92;
   utter.pitch = 1;
+  utter.volume = 1;
+
   currentUtterance = utter;
-  btn.textContent = '⏹ Stop';
-  btn.classList.add('speaking');
-  btn.dataset.speaking = '1';
+  
+  utter.onstart = () => {
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('speaking');
+    btn.dataset.speaking = '1';
+  };
+
   utter.onend = utter.onerror = () => {
     currentUtterance = null;
     btn.textContent = '🔊 Listen';
     btn.classList.remove('speaking');
     btn.dataset.speaking = '0';
   };
+
   speechSynthesis.speak(utter);
 }
 
@@ -874,9 +998,11 @@ function renderResult(result) {
   chat.appendChild(row);
   scrollBottom();
 
+  const responseLang = result.lang || currentLang;
+
   if (attachSpeak) {
     const btn = row.querySelector('#' + attachSpeak.id);
-    if (btn) btn.onclick = () => speakText(attachSpeak.text, btn);
+    if (btn) btn.onclick = () => speakText(attachSpeak.text, btn, responseLang);
   }
 
   // Auto-read: fires for ALL response types when toggle is ON
@@ -888,7 +1014,7 @@ function renderResult(result) {
       speakText = result.reply;
 
     } else if (result.type === 'names_only' && result.reply) {
-      speakText = 'Here are the schemes found. ' + result.reply;
+      speakText = result.reply;
 
     } else if (result.type === 'specific_field' && result.reply) {
       const fieldLabel = (result.field || '').replace(/_/g, ' ');
@@ -897,24 +1023,20 @@ function renderResult(result) {
     } else if (result.type === 'full_detail' && result.schemes?.length) {
       speakText = result.schemes.map((s, i) =>
         `Scheme ${i+1}: ${s.scheme_name || ''}. ` +
-        (s.description ? `Description: ${s.description}. ` : '') +
-        (s.benefits ? `Benefits: ${s.benefits}. ` : '') +
-        (s.eligibility ? `Eligibility: ${s.eligibility}.` : '')
+        (s.description ? `${s.description}. ` : '') +
+        (s.benefits ? `${s.benefits}. ` : '') +
+        (s.eligibility ? `${s.eligibility}.` : '')
       ).join(' ');
 
     } else if (result.type === 'eligibility_result' && result.schemes?.length) {
-      speakText = `Found ${result.schemes.length} eligible schemes. ` +
-        result.schemes.map((s, i) =>
-          `${i+1}: ${s.scheme_name || ''}. ${s.why_eligible || ''}`
-        ).join('. ');
+      speakText = result.schemes.map((s, i) =>
+        `${i+1}: ${s.scheme_name || ''}. ${s.why_eligible || ''}`
+      ).join('. ');
 
     } else if (result.type === 'eligibility_for_shown' && result.schemes?.length) {
-      const eligible = result.schemes.filter(s => s.is_eligible);
-      const notEligible = result.schemes.filter(s => !s.is_eligible);
-      speakText = `Eligibility check complete. ${eligible.length} eligible, ${notEligible.length} not eligible. ` +
-        result.schemes.map(s =>
-          `${s.scheme_name || ''}: ${s.is_eligible ? 'Eligible. ' : 'Not eligible. '}${s.reason || ''}`
-        ).join('. ');
+      speakText = result.schemes.map(s =>
+        `${s.scheme_name || ''}: ${s.is_eligible ? 'Eligible. ' : 'Not eligible. '}${s.reason || ''}`
+      ).join('. ');
 
     } else if (result.error) {
       speakText = 'Error: ' + result.error;
@@ -925,23 +1047,33 @@ function renderResult(result) {
         if (!window.speechSynthesis) return;
         speechSynthesis.cancel();
 
-        // Wrap bubble words into spans FIRST, then build speakText FROM those spans
-        // This guarantees charIndex in onboundary aligns exactly with span positions
         const bubble = row.querySelector('.bubble.ai') || row.querySelector('.bubble');
         let wordSpans = [];
-        let alignedText = speakText; // fallback
+        let alignedText = speakText; 
 
         if (bubble) {
           wrapWordsInBubble(bubble);
           wordSpans = Array.from(bubble.querySelectorAll('.tts-word'));
-          // Rebuild speak string directly from the spans so charIndex matches perfectly
           if (wordSpans.length > 0) {
             alignedText = wordSpans.map(s => s.textContent).join(' ');
           }
         }
 
-        const utter = new SpeechSynthesisUtterance(alignedText);
-        utter.lang = VOICE_LANG[currentLang] || 'en-IN';
+        const cleanedText = cleanTextForSpeech(alignedText, responseLang);
+        if (!cleanedText) return;
+
+        const utter = new SpeechSynthesisUtterance(cleanedText);
+        const langCode = VOICE_LANG[responseLang] || 'en-IN';
+        utter.lang = langCode;
+        
+        const voice = getVoiceForLang(langCode);
+        if (voice) {
+          utter.voice = voice;
+          if (langCode.startsWith('gu') && voice.lang.startsWith('hi')) {
+             utter.lang = 'hi-IN';
+          }
+        }
+
         utter.rate = 0.88;
         utter.pitch = 1;
         currentUtterance = utter;
@@ -1024,6 +1156,38 @@ function wrapWordsInBubble(el) {
   });
 }
 
+function formatStructuredText(text) {
+  if (!text || ['not available','n/a','none',''].includes(String(text).toLowerCase())) {
+    return `<span class="field-value" style="color:var(--muted)">Not available</span>`;
+  }
+
+  // Handle both literal \n and <br>
+  const lines = String(text).split(/\r?\n|<br>/).filter(l => l.trim().length > 0);
+  
+  if (lines.length <= 1 && !/^[0-9]+[\.\)]|^\s*[\•\-\*]/.test(text)) {
+    return `<span class="field-value">${escapeHtml(text)}</span>`;
+  }
+
+  let html = `<div class="structured-list">`;
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    // Match Step 1:, 1., (1)
+    const stepMatch = trimmed.match(/^([0-9\u0AB0-\u0AB9]+[\.\)]|Step\s*[0-9]+[:\.]?|પગલું\s*[0-9]+[:\.]?|चरण\s*[0-9]+[:\.]?)\s*(.*)/i);
+    // Match •, *, -
+    const bulletMatch = trimmed.match(/^([\•\-\*])\s*(.*)/);
+
+    if (stepMatch) {
+      html += `<div class="list-item step"><span class="step-marker">${escapeHtml(stepMatch[1])}</span> ${escapeHtml(stepMatch[2])}</div>`;
+    } else if (bulletMatch) {
+      html += `<div class="list-item bullet"><span class="bullet-marker">●</span> ${escapeHtml(bulletMatch[2])}</div>`;
+    } else {
+      html += `<div class="list-item">${escapeHtml(trimmed)}</div>`;
+    }
+  });
+  html += `</div>`;
+  return html;
+}
+
 function unwrapWordsInBubble(el) {
   if (!el) return;
   el.querySelectorAll('.tts-word').forEach(span => {
@@ -1055,21 +1219,21 @@ function buildSchemeCard(s, i) {
         <span class="field-label">Description</span>
         <span class="field-value">${escapeHtml(s.description || 'Not available')}</span>
       </div>
-      <div class="scheme-field">
+      <div class="scheme-field full">
         <span class="field-label">Benefits</span>
-        <span class="field-value">${escapeHtml(s.benefits || 'Not available')}</span>
+        ${formatStructuredText(s.benefits)}
       </div>
-      <div class="scheme-field">
+      <div class="scheme-field full">
         <span class="field-label">Eligibility</span>
-        <span class="field-value">${escapeHtml(s.eligibility || 'Not available')}</span>
+        ${formatStructuredText(s.eligibility)}
       </div>
-      <div class="scheme-field">
+      <div class="scheme-field full">
         <span class="field-label">Documents Required</span>
-        <span class="field-value">${escapeHtml(s.documents_required || 'Not available')}</span>
+        ${formatStructuredText(s.documents_required)}
       </div>
-      <div class="scheme-field">
+      <div class="scheme-field full">
         <span class="field-label">Application Process</span>
-        <span class="field-value">${escapeHtml(s.application_process || 'Not available')}</span>
+        ${formatStructuredText(s.application_process)}
       </div>
       <div class="divider"></div>
       <div class="scheme-field full">
@@ -1111,6 +1275,7 @@ async function sendMessage() {
     let streamingBubble = null;
     let fullText = '';
     let schemesWrapper = null;
+    let serverLang = currentLang;
 
     while (true) {
       const { value, done } = await reader.read();
@@ -1126,6 +1291,7 @@ async function sendMessage() {
 
             if (data.type === 'conversational_start') {
               removeTyping();
+              if (data.lang) serverLang = data.lang;
               streamingRow = document.createElement('div');
               streamingRow.className = 'msg-row ai';
               streamingRow.innerHTML = `<div class="avatar ai">🤖</div><div class="bubble ai" id="streaming-bubble"></div>`;
@@ -1140,7 +1306,7 @@ async function sendMessage() {
               }
             } else if (data.type === 'conversational_end') {
               if (streamingRow) streamingRow.remove();
-              renderResult({ type: 'conversational', reply: fullText, lang: currentLang });
+              renderResult({ type: 'conversational', reply: fullText, lang: serverLang });
             } else if (data.type === 'schemes_start') {
               removeTyping();
               const row = document.createElement('div');
@@ -1174,10 +1340,12 @@ async function sendMessage() {
                 streamingRow = null;
                 streamingBubble = null;
               }
-              data.type = 'full_detail';  // map back to existing render logic
+              data.type = 'full_detail';
+              data.lang = serverLang;
               renderResult(data);
             } else {
               removeTyping();
+              if (!data.lang) data.lang = serverLang;
               renderResult(data);
             }
           } catch(e) {}

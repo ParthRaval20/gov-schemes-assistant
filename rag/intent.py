@@ -290,16 +290,20 @@ def resolve_scheme_reference(question: str, question_en: str, schemes: list) -> 
     names_map = {f"{i+1}": get_name(s) for i, s in enumerate(schemes)}
     map_str = "\n".join(f"{k}. {v}" for k, v in names_map.items())
     
-    prompt = f"""You are a matching system. Identify which exact scheme(s) the user is referring to from this list:
+    prompt = f"""You are a matching system. Identify which exact scheme(s) from the provided list the user is referring to.
+
+List of Schemes (English):
 {map_str}
 
-User query: "{question}"
+User Query (Native/Mix): "{question}"
 
-Which scheme number(s) does the user want?
-- If one matches, return its number (e.g. 3)
-- If multiple, return separated by comma (e.g. 1, 3)
-- If NONE match, return 0
-Reply ONLY with digits/commas, no text."""
+Instructions:
+- Identifying which scheme number(s) the user is interested in.
+- Match translated Hindi/Gujarati names to English names.
+- If one matches, return its number (e.g. 3).
+- If multiple, return separated by comma (e.g. 1, 3).
+- If NONE match, return 0.
+- Reply ONLY with digits/commas, no other text."""
 
     try:
         raw = get_llm().invoke(prompt).content.strip()

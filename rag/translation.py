@@ -22,8 +22,8 @@ LANG_STRINGS = {
         "ask_schemes_first": "कृपया पहले कोई योजना खोजें, फिर मैं उनके लिए आपकी पात्रता जाँच सकता हूँ।",
     },
     "gu": {
-        "profile_request": """ચોકકસ! પાત્રતા તપાસવા માટે કૃપા કરીને આ માહિતી આપો:\n\n  \u2022 ઉંમર\n  \u2022 વાર્ષિક આવક  (દા.ત. 1.5 લાખ, 50,000)\n  \u2022 વ્યવસાય      (દા.ત. વિદ્યાર્થી, ખેડૂત, સ્વ-રોજગાર)\n  \u2022 રાજ્ય        (દા.ત. ગુજરાત)\n  \u2022 જાતિ         (પુરુષ / સ્ત્રી)\n  \u2022 જ્ણાતિ/વર્ગ  (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nઉદાહરણ:\n  ઉંમર: 22, આવક: 1.5 લાખ, વ્યવસાય: વિદ્યાર્થી, રાજ્ય: ગુજરાત, જ્ણાતિ: OBC, જાતિ: પુરુષ""",
-        "no_schemes_found": "કોઈ મળતી યોજના મળી નહીં. કૃપા કરીને ઉંમર, આવક, વ્યવસાય, રાજ્ય અને જ્ણાતિ આપો.",
+        "profile_request": """ચોક્કસ! પાત્રતા તપાસવા માટે કૃપા કરીને આ માહિતી આપો:\n\n  \u2022 ઉંમર\n  \u2022 વાર્ષિક આવક  (દા.ત. 1.5 લાખ, 50,000)\n  \u2022 વ્યવસાય      (દા.ત. વિદ્યાર્થી, ખેડૂત, સ્વ-રોજગાર)\n  \u2022 રાજ્ય        (દા.ત. ગુજરાત)\n  \u2022 જાતિ         (પુરુષ / સ્ત્રી)\n  \u2022 જ્ઞાતિ/વર્ગ  (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nઉદાહરણ:\n  ઉંમર: 22, આવક: 1.5 લાખ, વ્યવસાય: વિદ્યાર્થી, રાજ્ય: ગુજરાત, જ્ઞાતિ: OBC, જાતિ: પુરુષ""",
+        "no_schemes_found": "કોઈ મળતી યોજના મળી નહીં. કૃપા કરીને ઉંમર, આવક, વ્યવસાય, રાજ્ય અને જ્ઞાતિ આપો.",
         "no_additional_schemes": "તમારી પ્રોફાઇલ માટે કોઈ વધારાની યોજना મળી નહીં.",
         "ask_schemes_first": "કૃપા કરીને પહેલાં કોઈ યોજना શોધો, પછી હું તમારી પાત્રતા તપાસીશ.",
     },
@@ -73,11 +73,17 @@ def translate_to_english(text: str, source_lang: str) -> str:
         return buttons[clean]
 
     lang_name = {"hi": "Hindi", "gu": "Gujarati"}[source_lang]
-    r = get_llm().invoke(
-        f"Translate this {lang_name} text to English.\n"
-        f"Keep unchanged: scheme names, SC/ST/OBC/EWS/SEBC, state names, numbers, rupee amounts.\n"
-        f"Return ONLY the English translation.\n\n{lang_name}: {text}\n\nEnglish:"
+    prompt = (
+        f"Translate this {lang_name} query to English for a government scheme search engine.\n"
+        f"Critical for Search Accuracy: For local terms (especially agricultural crops like 'Bajri', 'Kapas', or 'Jowar', products, or occupations like 'Khedut'), "
+        f"provide BOTH the common transliterated name and the standard English translation. "
+        f"Example: 'બાજરી' -> 'bajri (millet)', 'કપાસ' -> 'kapas (cotton)', 'મગફળી' -> 'magfali (groundnut)'. "
+        f"Keep unchanged: scheme names, acronyms like SC/ST/OBC/EWS/SEBC, state names, numbers, rupee amounts.\n"
+        f"Return ONLY the English translation.\n\n"
+        f"{lang_name}: {text}\n"
+        f"English:"
     )
+    r = get_llm().invoke(prompt)
     return r.content.strip()
 
 def translate_response(text: str, target_lang: str) -> str:
@@ -122,7 +128,9 @@ def translate_scheme_dict(d: dict, target_lang: str) -> dict:
         "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (हिन्दी). Do NOT output Gujarati.",
         "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (ગુજરાતી). Do NOT output Hindi.",
     }.get(target_lang, "")
-    prompt = f"""Translate the text values to {lang_name} while keeping numbers, Rs amounts, 'official_link', and SC/ST/OBC acronyms exactly the same.
+    prompt = f"""Translate text values to {lang_name} while keeping numbers, Rs amounts, links, and SC/ST/OBC acronyms exactly the same.
+CRITICAL: Preserve all original line breaks and structural patterns like numbered lists (1. 2. 3.) or bullet points (•).
+CLEAN UI RULE: Remove redundant link-directing filler phrases such as "click here", "click", "here", "visit link", or native versions like "यहाँ क्लिक करें", "यहाँ", "અહીં ક્લિક કરો", "અહીં" from the output to keep it cleaner.
 {script_warn}
 Return ONLY valid JSON that matches the required schema.
 
