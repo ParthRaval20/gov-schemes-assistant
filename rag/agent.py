@@ -103,16 +103,30 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
     PROFILE_REQUEST = ls("profile_request")
     awaiting_profile = session.get("awaiting_profile", False)
 
-    # \u2500\u2500 ✅ SEQUENTIAL: translate + detect intent (parallel disabled for rate limits) 
-    # Internal translation must always use the detected input language
+    # \u2500\u2500 Sequential Step 1: Translation (MUST happen first)
     question_en = translate_to_english(question, detected)
-    intent = detect_intent(question_en, chat_history, awaiting_profile)
+    
+    # 2. IMMEDIATE FEEDBACK: Tell the user we're working
+    search_msg = { "en": "Searching...", "hi": "\u0916\u094b\u091c \u0930\u0939\u093e \u0939\u0942\u0901...", "gu": "\u0ab6\u0acb\u0aa7\u0ac0 \u0ab0\u0ab9\u0acd\u0aaf\u0acb \u0a9b\u0ac1\u0a82..." }.get(lang, "Searching...")
+    # yield {"type": "conversational_start", "lang": lang}
+    # yield {"type": "chunk", "text": f"*{search_msg}*"}
+
+    # \u2500\u2500 Step 3: Parallelized Tasks (Intent, Profile, Field, Gender)
+    # Once we have question_en, we can run all other analysis in parallel to save ~4-6 seconds.
+    # Parallelize: detect_intent, extract_user_profile, detect_field, extract_gender_from_question
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        f_intent = ex.submit(detect_intent, question_en, chat_history, awaiting_profile)
+        f_profile = ex.submit(extract_user_profile, question_en)
+        f_gender = ex.submit(extract_gender_from_question, question_en)
+        
+        # Wait for those that are needed immediately
+        intent = f_intent.result()
+        profile_update = f_profile.result()
+        gender_hint = f_gender.result()
 
     # \u2500\u2500 User provided their profile 
     if intent == "eligibility_check":
-        profile = extract_user_profile(question_en)
-        gender_hint = extract_gender_from_question(question_en)
-        profile = merge_gender_into_profile(profile, gender_hint)
+        profile = merge_gender_into_profile(profile_update, gender_hint)
         session["user_profile"] = profile
         session["awaiting_profile"] = False
 
