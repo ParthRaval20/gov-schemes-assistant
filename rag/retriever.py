@@ -9,7 +9,15 @@ from rag.intent import is_direct_scheme_name_query, rewrite_question
 
 EXTRACTION_SYSTEM = """You are an AI assistant for Gujarat government schemes.
 
-Map document fields as follows:
+Rules for Extraction:
+1. For 'application_process', ALWAYS refactor messy blocks into a clean, numbered list (1, 2, 3...) with one step per line.
+2. For 'benefits' and 'eligibility', use clear bullet points (•) if there are multiple distinct points.
+3. Remove redundant filler phrases like "click here", "click", "visit link", or "here" from all fields. We display links separately as a dedicated button.
+4. Copy values from the context but ensure they are STRUCTURED for readability.
+5. Keep scheme names, state names, and acronyms like SC/ST/OBC exactly as found.
+6. Only use 'Not Available' if truly absent.
+
+Map document fields:
   "Scheme name"         → scheme_name
   "Description"         → description
   "category"            → category
@@ -19,8 +27,7 @@ Map document fields as follows:
   "required_documents"  → documents_required
   "state"               → state
   "Link"                → official_link
-
-Rules: Extract EVERY scheme. Copy values EXACTLY. Only use 'Not Available' if truly absent."""
+"""
 
 
 def extract_specific_scheme_name(question: str, last_schemes: list) -> str | None:
@@ -70,11 +77,25 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
     search_query  = specific_name if specific_name else extract_search_topic(question)
 
     standalone = rewrite_question(question, chat_history)
-    docs = get_vector_db().as_retriever(search_kwargs={"k": 5 if specific_name else k}).invoke(search_query)
+
+    def _do_search(q, limit):
+        # Fallback logic: "bajri (millet)" -> try "bajri", then "millet"
+        if "(" in q and ")" in q:
+            first_q = re.sub(r'(\w+)\s*\((.*?)\)', r'\1', q)
+            print(f"🔍 Trying primary search topic: {first_q}")
+            res = get_vector_db().as_retriever(search_kwargs={"k": limit}).invoke(first_q)
+            if not res:
+                second_q = re.sub(r'(\w+)\s*\((.*?)\)', r'\2', q)
+                print(f"🔍 No results. Trying fallback topic: {second_q}")
+                res = get_vector_db().as_retriever(search_kwargs={"k": limit}).invoke(second_q)
+            return res
+        return get_vector_db().as_retriever(search_kwargs={"k": limit}).invoke(q)
+
+    docs = _do_search(search_query, 5 if specific_name else k)
 
     # If rewrite actually changed the query, re-run DB search with the better query
     if not specific_name and standalone.lower().strip() != question.lower().strip():
-        docs = get_vector_db().as_retriever(search_kwargs={"k": k}).invoke(standalone)
+        docs = _do_search(standalone, k)
 
     context = format_docs(docs)
 

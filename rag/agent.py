@@ -82,12 +82,16 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
 
     # \u2500\u2500 Language detection 
     detected = detect_language(question)
-    if detected != "en":
-        lang = detected
-    elif ui_lang and ui_lang in ("en", "hi", "gu"):
+    
+    # Priority 1: UI selection
+    if ui_lang and ui_lang in ("en", "hi", "gu"):
         lang = ui_lang
+    # Priority 2: User input language
+    elif detected != "en":
+        lang = detected
     else:
         lang = session.get("lang", "en")
+    
     session["lang"] = lang
 
     def reply_in_lang(text: str) -> str:
@@ -100,12 +104,9 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None):
     awaiting_profile = session.get("awaiting_profile", False)
 
     # \u2500\u2500 ✅ SEQUENTIAL: translate + detect intent (parallel disabled for rate limits) 
-    if lang == "en":
-        question_en = question
-        intent = detect_intent(question_en, chat_history, awaiting_profile)
-    else:
-        question_en = translate_to_english(question, lang)
-        intent = detect_intent(question_en, chat_history, awaiting_profile)
+    # Internal translation must always use the detected input language
+    question_en = translate_to_english(question, detected)
+    intent = detect_intent(question_en, chat_history, awaiting_profile)
 
     # \u2500\u2500 User provided their profile 
     if intent == "eligibility_check":

@@ -42,9 +42,12 @@ class UserProfile(BaseModel):
     income: Optional[str] = Field(None)
     occupation: Optional[str] = Field(None)
     state: Optional[str] = Field(None)
-    gender: Optional[str] = Field(None)
-    caste_category: Optional[str] = Field(None, description="Social/caste category: SC, ST, OBC, General, EWS, NT, DNT, SEBC, Minority etc.")
-    extra: Optional[str] = Field(None, description="Any other relevant info e.g. disability, BPL, marital status")
+class QueryPreprocessor(BaseModel):
+    detected_lang: str = Field(description="Detected language code (en, hi, gu)")
+    question_en: str = Field(description="Translation of the user question into English")
+    intent: str = Field(description="One of: conversational, scheme_search, eligibility_check, names_only, specific_field")
+    field: Optional[str] = Field(None, description="Specific field if intent is 'specific_field'")
+    profile: Optional[UserProfile] = Field(None)
 
 # -------------------------------------------------
 # Lazy Loaders
@@ -56,6 +59,13 @@ _llm = None
 _structured_llm = None
 _minimal_structured_llm = None
 _profile_llm = None
+_preprocessor_llm = None
+
+def get_preprocessor_llm():
+    global _preprocessor_llm
+    if _preprocessor_llm is None:
+        _preprocessor_llm = get_llm().with_structured_output(QueryPreprocessor)
+    return _preprocessor_llm
 
 def get_embedding_model():
     global _embedding_model
