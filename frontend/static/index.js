@@ -193,6 +193,7 @@ function toggleProfileModal(event) {
             document.getElementById('profile-age').value = data.user.age || "";
             document.getElementById('profile-income').value = data.user.income || "";
             document.getElementById('profile-category').value = data.user.category || "General";
+            document.getElementById('profile-gender').value = data.user.gender || "Male";
             document.getElementById('profile-occupation').value = data.user.occupation || "";
             document.getElementById('profile-email-notif').checked = data.user.email_notifications;
         }
@@ -211,6 +212,7 @@ async function handleUpdateProfile() {
     income: document.getElementById('profile-income').value,
     category: document.getElementById('profile-category').value,
     occupation: document.getElementById('profile-occupation').value,
+    gender: document.getElementById('profile-gender').value,
     email_notifications: document.getElementById('profile-email-notif').checked
   };
 
