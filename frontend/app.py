@@ -132,12 +132,21 @@ def update_profile():
         user.income = int(data.get("income")) if data.get("income") else user.income
         user.category = data.get("category") or user.category
         user.occupation = data.get("occupation") or user.occupation
+        user.gender = data.get("gender") or user.gender
         user.email_notifications = 1 if data.get("email_notifications") else 0
         
         db.commit()
         db.refresh(user)
         
         session["user_name"] = user.full_name
+        
+        # Clear the cached RAG session profile so it re-fetches from DB on next message
+        session_id = session.get("session_id")
+        if session_id:
+            from rag.memory import get_session
+            rag_session = get_session(session_id)
+            rag_session["user_profile"] = None
+
         return jsonify({"status": "ok", "user": {"id": user.id, "name": user.full_name}})
     except Exception as e:
         db.rollback()
@@ -228,6 +237,14 @@ def signup():
         
         session["user_id"] = user.id
         session["user_name"] = user.full_name
+        
+        # Clear the cached RAG session profile so it re-fetches from DB on next message
+        session_id = session.get("session_id")
+        if session_id:
+            from rag.memory import get_session
+            rag_session = get_session(session_id)
+            rag_session["user_profile"] = None
+
         return jsonify({"status": "ok", "user": {"id": user.id, "name": user.full_name}})
     except Exception as e:
         db.rollback()
@@ -249,6 +266,14 @@ def login():
 
         session["user_id"] = user.id
         session["user_name"] = user.full_name
+        
+        # Clear the cached RAG session profile so it re-fetches from DB on next message
+        session_id = session.get("session_id")
+        if session_id:
+            from rag.memory import get_session
+            rag_session = get_session(session_id)
+            rag_session["user_profile"] = None
+
         return jsonify({"status": "ok", "user": {"id": user.id, "name": user.full_name}})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
