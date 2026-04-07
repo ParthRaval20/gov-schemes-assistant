@@ -3,7 +3,8 @@ import asyncio
 import logging
 import uuid
 import requests
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
+
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from dotenv import load_dotenv
 
@@ -35,15 +36,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
     db.close()
     
-    if user:
-        await update.message.reply_text(f"Namaste {user.full_name}! 🙏\nWelcome back to Yojana AI. How can I help you today?")
-    # else:
-    #     await update.message.reply_text(
-    #         "Namaste! 🙏 Welcome to *Yojana AI*.\n\nTo link your account, send: `link your-email@example.com`",
-    #         parse_mode='Markdown'
-    #     )
+    reply_keyboard = [
+        ["🌾 Schemes for farmers", "🧑‍🎓 Education scholarships"],
+        ["🏥 Healthcare schemes", "🏠 Housing scheme"],
+        ["🇺🇸 EN", "🇮🇳 HI", "🇮🇳 GU"]
+    ]
+    markup = ReplyKeyboardMarkup(reply_keyboard, resize_keyboard=True, input_field_placeholder="Ask about schemes...", one_time_keyboard=False)
 
-async def process_text_and_reply(update: Update, text: str, chat_id: str, is_voice=False):
+    if user:
+        await update.message.reply_text(f"Namaste {user.full_name}! 🙏\nWelcome back to Yojana AI. How can I help you today?", reply_markup=markup)
+    else:
+        await update.message.reply_text(
+            "Namaste! 🙏 Welcome to *Yojana AI*.\n\nTo link your account, send: `link your-email@example.com`\nOr just ask me a question!",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+
+async def process_text_and_reply(update: Update, text: str, chat_id: str, context: ContextTypes.DEFAULT_TYPE = None, is_voice=False):
     db = SessionLocal()
     user = db.query(User).filter(User.telegram_chat_id == chat_id).first()
     user_context = None
@@ -59,7 +68,8 @@ async def process_text_and_reply(update: Update, text: str, chat_id: str, is_voi
     schemes_data = []
 
     # Collect RAG response
-    for chunk in ask_agent(text, session_id=session_id, user_context=user_context):
+    ui_lang = context.user_data.get('lang', 'en') if context else 'en'
+    for chunk in ask_agent(text, session_id=session_id, user_context=user_context, ui_lang=ui_lang):
         # 1. Collect conversational text but SKIP UI-only placeholders
         if chunk['type'] in ['chunk', 'conversational', 'names_only', 'specific_field']:
             incoming_chunk = chunk.get('text', '') or chunk.get('reply', '')
@@ -124,7 +134,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.close()
         return
 
-    await process_text_and_reply(update, text, chat_id)
+    # 2. Handle Language Selection Chips
+    if text == "🇺🇸 EN":
+        context.user_data['lang'] = 'en'
+        await update.message.reply_text("Language set to English. 🇺🇸 Ask your question or select a category below.")
+        return
+    elif text == "🇮🇳 HI":
+        context.user_data['lang'] = 'hi'
+        await update.message.reply_text("भाषा हिंदी में सेट कर दी गई है। 🇮🇳 अपना प्रश्न पूछें या नीचे से श्रेणी चुनें।")
+        return
+    elif text == "🇮🇳 GU":
+        context.user_data['lang'] = 'gu'
+        await update.message.reply_text("ભાષા ગુજરાતીમાં પસંદ કરાઈ છે. 🇮🇳 તમારો પ્રશ્ન પૂછો અથવા નીચેથી શ્રેણી પસંદ કરો.")
+        return
+
+    await process_text_and_reply(update, text, chat_id, context)
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
@@ -139,7 +163,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 model="whisper-large-v3",
                 response_format="json"
             )
-        await process_text_and_reply(update, transcription.text, chat_id, is_voice=True)
+        await process_text_and_reply(update, transcription.text, chat_id, context, is_voice=True)
     finally:
         if os.path.exists(temp_ogg): os.remove(temp_ogg)
 
