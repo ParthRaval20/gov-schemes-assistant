@@ -287,6 +287,13 @@ header::after {
   line-height: 1;
 }
 
+.brand-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+}
+
 .brand-text {
   font-family: 'Rajdhani', sans-serif;
 }

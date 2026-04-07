@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🇮🇳 Yojna Ai — Your AI Guide to Government Schemes</title>
+    <!-- Meta Tags for SEO -->
+    <meta name="description" content="Discover and check eligibility for Gujarat government schemes with Yojna Ai. AI-powered, multilingual, and voice-enabled assistant.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='landing.css') }}">
+</head>
+<body>
+    <!-- Header/Nav -->
+    <nav class="glass">
+        <div class="container nav-content">
+            <div class="brand">
+                <span class="flag">🇮🇳</span>
+                <div class="brand-info">
+                    <span class="brand-name">YOJNA AI</span>
+                    <span class="brand-tagline">Government Scheme Assistant</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#tech">Technology</a>
+                <a href="{{ url_for('app_interface') }}" class="btn-cta-small">Try Now</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="animated-bg"></div>
+        <div class="container hero-content">
+            <div class="hero-text animate-up">
+                <span class="badge">Next-Gen AI Assistant</span>
+                <h1>Empowering Citizens Through <span class="gradient-text">AI Innovation</span></h1>
+                <p>Simplify your search for government benefits. Yojna Ai uses advanced RAG and Mistral LLMs to help you find eligible schemes in seconds.</p>
+                <div class="hero-btns">
+                    <a href="{{ url_for('app_interface') }}" class="btn-primary-glow">Experience Yojna AI</a>
+                    <a href="#features" class="btn-outline">Learn More</a>
+                </div>
+            </div>
+            <div class="hero-visual animate-fade">
+                <div class="floating-card glass">
+                    <div class="card-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="chat-msg bot">
+                            <span class="avatar">🤖</span>
+                            <p>Namaste! I found 5 schemes you are eligible for based on your profile.</p>
+                        </div>
+                        <div class="chat-msg user">
+                            <span class="avatar">👤</span>
+                            <p>Great! Can you show me the Scheme For Farmers?</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Middle CTA Section -->
+    <section class="mid-cta animate-reveal">
+        <div class="container text-center">
+            <h2>Ready to find your benefits?</h2>
+            <p>Join thousands of citizens using AI to navigate government schemes easily.</p>
+            <a href="{{ url_for('app_interface') }}" class="btn-massive-glow">Try Yojna Ai Now</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header text-center">
+                <span class="sub-title">Core Capabilities</span>
+                <h2>Smart Features for Smarter Citizens</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card glass animate-up">
+                    <div class="icon">🔍</div>
+                    <h3>Smart Search</h3>
+                    <p>Powerful vector search across hundreds of schemes using ChromaDB and HuggingFace embeddings.</p>
+                </div>
+                <div class="feature-card glass animate-up">
+                    <div class="icon">🗣️</div>
+                    <h3>Voice Enabled</h3>
+                    <p>Speak naturally in English, Hindi, or Gujarati using Whisper STT and Edge-TTS voice systems.</p>
+                </div>
+                <div class="feature-card glass animate-up">
+                    <div class="icon">🇮🇳</div>
+                    <h3>Multilingual</h3>
+                    <p>Fully optimized for regional languages to ensure everyone can access information comfortably.</p>
+                </div>
+                <div class="feature-card glass animate-up">
+                    <div class="icon">✅</div>
+                    <h3>Eligibility Check</h3>
+                    <p>Personalized analysis of your age, income, and category to find schemes that fit you perfectly.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section class="tech" id="tech">
+        <div class="container">
+            <div class="section-header text-center">
+                <span class="sub-title">Built with Cutting-Edge Tech</span>
+                <h2>The Power Behind Yojna Ai</h2>
+            </div>
+            <div class="tech-grid">
+                <div class="tech-item" title="Python & Flask">
+                    <img src="https://img.icons8.com/color/96/python--v1.png" alt="Python">
+                    <span>Flask Backend</span>
+                </div>
+                <div class="tech-item" title="Mistral AI">
+                    <span class="tech-emoji">🧠</span>
+                    <span>Mistral LLM</span>
+                </div>
+                <div class="tech-item" title="ChromaDB">
+                    <span class="tech-emoji">🗄️</span>
+                    <span>Vector DB</span>
+                </div>
+                <div class="tech-item" title="Groq">
+                    <span class="tech-emoji">⚡</span>
+                    <span>Groq Inference</span>
+                </div>
+                <div class="tech-item" title="HTML5/CSS3">
+                    <img src="https://img.icons8.com/color/96/html-5--v1.png" alt="HTML5">
+                    <span>Modern Front end</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Omnichannel Section -->
+    <section class="omnichannel animate-reveal">
+        <div class="container text-center">
+            <span class="sub-title">Connect on the Go</span>
+            <h2>Available Everywhere You Are</h2>
+            <p>Access Yojna Ai through your favorite messaging apps for instant help anytime, anywhere.</p>
+            <div class="bot-btns">
+                <a href="https://t.me/Yojna_ai_bot" target="_blank" class="btn-bot telegram">
+                    <span class="bot-icon">✈️</span> Connect on Telegram
+                </a>
+                <a href="https://wa.me/14155238886?text=Namaste" target="_blank" class="btn-bot whatsapp">
+                    <span class="bot-icon">💬</span> Chat on WhatsApp
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-left">
+                <span class="brand-name">YOJNA AI</span>
+                <p>&copy; 2026 AI Innovation Lab. All rights reserved.</p>
+            </div>
+            <div class="footer-right">
+                <div class="social-links">
+                    <a href="https://wa.me/14155238886?text=Namaste" target="_blank">WhatsApp</a>
+                    <a href="https://t.me/Yojna_ai_bot" target="_blank">Telegram</a>
+                </div>
+                <p>Empowering the nation, one citizen at a time.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='landing.js') }}"></script>
+</body>
+</html>
