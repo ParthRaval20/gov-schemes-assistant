@@ -37,11 +37,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if user:
         await update.message.reply_text(f"Namaste {user.full_name}! 🙏\nWelcome back to Yojana AI. How can I help you today?")
-    else:
-        await update.message.reply_text(
-            "Namaste! 🙏 Welcome to *Yojana AI*.\n\nTo link your account, send: `link your-email@example.com`",
-            parse_mode='Markdown'
-        )
+    # else:
+    #     await update.message.reply_text(
+    #         "Namaste! 🙏 Welcome to *Yojana AI*.\n\nTo link your account, send: `link your-email@example.com`",
+    #         parse_mode='Markdown'
+    #     )
 
 async def process_text_and_reply(update: Update, text: str, chat_id: str, is_voice=False):
     db = SessionLocal()
@@ -143,13 +143,25 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if os.path.exists(temp_ogg): os.remove(temp_ogg)
 
-if __name__ == '__main__':
+def start_telegram_bot():
     if not TELEGRAM_TOKEN:
         print("❌ Error: TELEGRAM_BOT_TOKEN not found")
-    else:
+        return
+
+    # Use a new event loop for this thread if necessary
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
         app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+        
         print("🚀 Telegram Bot (with Voice) is running...")
-        app.run_polling()
+        app.run_polling(close_loop=False)
+    except Exception as e:
+        print(f"❌ Telegram Bot Error: {e}")
+
+if __name__ == '__main__':
+    start_telegram_bot()
