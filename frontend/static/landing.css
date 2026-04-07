@@ -102,7 +102,15 @@ nav a:hover { color: var(--saffron); }
     padding: 8px 20px;
     border-radius: 5px;
     font-weight: 600;
+    color: white !important; /* Force white text */
     box-shadow: 0 4px 15px rgba(255, 153, 51, 0.3);
+    transition: 0.3s;
+}
+
+.btn-cta-small:hover {
+    background: var(--navy);
+    color: white !important;
+    transform: translateY(-2px);
 }
 
 /* Hero Section */
@@ -194,6 +202,7 @@ nav a:hover { color: var(--saffron); }
 .btn-primary-glow:hover {
     transform: translateY(-5px);
     box-shadow: 0 0 30px rgba(255, 153, 51, 0.6);
+    color: white;
 }
 
 .btn-outline {
@@ -283,6 +292,7 @@ nav a:hover { color: var(--saffron); }
 .btn-massive-glow:hover {
     transform: scale(1.05);
     box-shadow: 0 0 60px rgba(255, 153, 51, 0.5);
+    color: white; /* Ensure text stays white */
 }
 
 .mid-cta h2 { font-size: 42px; margin-bottom: 15px; }
