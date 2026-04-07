@@ -6,8 +6,6 @@ const inputHint = document.getElementById('input-hint');
 
 // ── Voice Input (Speech-to-Text) ─────────────────────────────────────────────
 let recognition = null;
-let mediaRecorder = null;
-let audioChunks = [];
 let isListening = false;
 
 const VOICE_LANG = { en: 'en-IN', hi: 'hi-IN', gu: 'gu-IN' };
@@ -47,78 +45,80 @@ function getVoiceForLang(langCode, isFallbackAttempt = false) {
 }
 
 async function toggleVoice() {
-  if (isListening) {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-    }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  
+  if (!SpeechRecognition) {
+    alert('Voice input is not supported in this browser. Please use Chrome or Edge.');
     return;
   }
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('Voice input is not supported in this browser or requires a secure (HTTPS) connection.');
+  if (isListening) {
+    if (recognition) recognition.stop();
     return;
   }
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    // Strictly map to English, Hindi, and Gujarati
+    const langMap = { 'en': 'en-IN', 'hi': 'hi-IN', 'gu': 'gu-IN' };
+    recognition.lang = langMap[currentLang] || 'en-IN';
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunks.push(event.data);
-    };
-
-    mediaRecorder.onstart = () => {
+    recognition.onstart = () => {
       isListening = true;
       micBtn.textContent = '🔴';
       micBtn.classList.add('listening');
       input.placeholder = VOICE_HINT[currentLang]?.listening || '🎙️ Listening…';
     };
 
-    mediaRecorder.onstop = async () => {
-      isListening = false;
-      micBtn.textContent = '🎙️';
-      micBtn.classList.remove('listening');
-      const L = LANG_UI[currentLang];
-      input.placeholder = L.placeholder;
+    recognition.onresult = (event) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
 
-      if (audioChunks.length === 0) return;
-
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-
-      // Show processing hint
-      const oldVal = input.value;
-      input.value = (currentLang === 'gu' ? 'પ્રોસેસિંગ...' : (currentLang === 'hi' ? 'प्रसंस्करण...' : 'Processing...'));
-
-      try {
-        const response = await fetch('/stt', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await response.json();
-        if (data.text) {
-          input.value = data.text;
-          autoResize(input);
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
         } else {
-          input.value = oldVal;
-          console.error("STT Error:", data.error);
+          interimTranscript += event.results[i][0].transcript;
         }
-      } catch (err) {
-        input.value = oldVal;
-        console.error("Fetch Error:", err);
       }
 
-      // Stop all tracks
-      stream.getTracks().forEach(track => track.stop());
+      // Update input instantly "catchup"
+      if (interimTranscript || finalTranscript) {
+        input.value = (finalTranscript + ' ' + interimTranscript).trim();
+        autoResize(input);
+      }
     };
 
-    mediaRecorder.start();
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+      if (event.error === 'not-allowed') {
+        alert("Microphone access denied.");
+      }
+      stopVoiceUI();
+    };
+
+    recognition.onend = () => {
+      stopVoiceUI();
+    };
+
+    recognition.start();
+
   } catch (err) {
-    console.error("Error accessing microphone:", err);
-    alert("Microphone access denied or error occurred.");
+    console.error("Error starting speech recognition:", err);
+    stopVoiceUI();
   }
+}
+
+function stopVoiceUI() {
+  isListening = false;
+  micBtn.textContent = '🎙️';
+  micBtn.classList.remove('listening');
+  const L = LANG_UI[currentLang];
+  if (L) input.placeholder = L.placeholder;
+  recognition = null;
 }
 
 // ── Text-to-Speech ────────────────────────────────────────────────────────────

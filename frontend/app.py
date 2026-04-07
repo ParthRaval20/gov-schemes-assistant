@@ -116,6 +116,11 @@ def update_profile():
 
 @app.route("/")
 def index():
+    return render_template("landing.html")
+
+
+@app.route("/app")
+def app_interface():
     if "session_id" not in session:
         session["session_id"] = str(uuid.uuid4())
     return render_template("index.html")
