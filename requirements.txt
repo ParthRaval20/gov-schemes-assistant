@@ -28,8 +28,8 @@ edge-tts
 requests
 pydantic
 pydantic-settings
-tqdm
 aiohttp
 aiohttp-retry
-pandas
-playwright
+
+# NOTE: playwright and pandas are NOT listed here — they are only needed
+# for the GitHub Actions scraper, which installs them at runtime separately.

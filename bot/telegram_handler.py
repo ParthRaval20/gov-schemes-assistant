@@ -32,7 +32,7 @@ logging.getLogger("telegram").setLevel(logging.WARNING)
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-GROQ_CLIENT = Groq(api_key=os.getenv("GROQ_API_KEY"))
+GROQ_API_KEY   = os.getenv("GROQ_API_KEY", "")  # Optional — only for Telegram voice
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
@@ -161,8 +161,12 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await voice_file.download_to_drive(temp_ogg)
     
     try:
+        if not GROQ_API_KEY:
+            await update.message.reply_text("⚠️ Voice not configured on this server.")
+            return
+        groq_client = Groq(api_key=GROQ_API_KEY)
         with open(temp_ogg, "rb") as file:
-            transcription = GROQ_CLIENT.audio.transcriptions.create(
+            transcription = groq_client.audio.transcriptions.create(
                 file=(temp_ogg, file.read()),
                 model="whisper-large-v3",
                 response_format="json"
