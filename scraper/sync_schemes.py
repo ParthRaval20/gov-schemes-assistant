@@ -44,11 +44,14 @@ if REPO_ROOT_FOR_AUTH not in sys.path:
     sys.path.insert(0, REPO_ROOT_FOR_AUTH)
 
 from utils.notifier import broadcast_new_schemes
-from database.db import SessionLocal, engine
+from database.db import SessionLocal, engine, init_db
 from database.models import Scheme
 from rag.llm import get_vector_db, get_embedding_model
 from dotenv import load_dotenv
 load_dotenv()
+
+# ── Auto-create database tables if they don't exist ───────────────────────────
+init_db()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 

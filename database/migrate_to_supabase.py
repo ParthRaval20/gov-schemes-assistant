@@ -7,6 +7,7 @@ from database.models import Base, Scheme
 from sqlalchemy.orm import sessionmaker
 from langchain_mistralai import MistralAIEmbeddings
 from supabase.client import create_client
+import time
 
 load_dotenv()
 print(f"📍 Current Working Directory: {os.getcwd()}")
@@ -31,11 +32,56 @@ def migrate():
         # 1. Clear and Prepare Tables
         print("🗑️ Resetting tables and enabling pgvector...")
         with engine.connect() as conn:
-            # We drop specific order because of dependencies
+            # Drop old tables
             conn.execute(text("DROP TABLE IF EXISTS documents CASCADE;"))
             conn.execute(text("DROP TABLE IF EXISTS schemes CASCADE;"))
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            
+            # Create DOCUMENTS table specifically for LangChain VectorStore
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS documents (
+                    id bigserial PRIMARY KEY,
+                    content text,
+                    metadata jsonb,
+                    embedding vector(1024)
+                );
+            """))
+            
+            # Create SEARCH function for LangChain similarity search
+            conn.execute(text("""
+                CREATE OR REPLACE FUNCTION match_documents (
+                    query_embedding vector(1024),
+                    match_threshold float,
+                    match_count int
+                )
+                RETURNS TABLE (
+                    id bigint,
+                    content text,
+                    metadata jsonb,
+                    similarity float
+                )
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    RETURN QUERY
+                    SELECT
+                        documents.id,
+                        documents.content,
+                        documents.metadata,
+                        1 - (documents.embedding <=> query_embedding) AS similarity
+                    FROM documents
+                    WHERE 1 - (documents.embedding <=> query_embedding) > match_threshold
+                    ORDER BY similarity DESC
+                    LIMIT match_count;
+                END;
+                $$;
+            """))
+            
             conn.commit()
+            print("🏗️ Base tables and SQL functions ready.")
+            # Give Supabase API a moment to refresh schema cache
+            print("⏳ Waiting for API sync...")
+            time.sleep(3)
 
         print("🏗️ Creating tables from definitions...")
         Base.metadata.create_all(bind=engine)
