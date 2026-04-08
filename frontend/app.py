@@ -16,7 +16,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import SessionLocal
 from database.models import User, ChatHistory, Notification
 from utils.notifier import broadcast_new_schemes
-from bot.telegram_handler import start_telegram_bot
+try:
+    from bot.telegram_handler import start_telegram_bot
+except Exception:
+    start_telegram_bot = None
 import asyncio
 import requests
 from twilio.twiml.messaging_response import MessagingResponse
