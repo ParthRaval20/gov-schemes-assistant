@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
@@ -27,7 +27,7 @@ if not DATABASE_URL or "None" in str(DATABASE_URL):
 try:
     # Use connection pooling and pre-ping to handle serverless connections/restarts
     engine = create_engine(
-        DATABASE_URL, 
+        DATABASE_URL,
         pool_pre_ping=True,
         pool_recycle=3600
     )
@@ -37,5 +37,20 @@ try:
 except Exception as e:
     # Stop execution if connection fails
     raise ConnectionError(f"❌ FATAL: Failed to connect to Supabase: {e}")
+
+# ── Auto-create tables and pgvector extension on first run ────────────────────
+def init_db():
+    """Creates tables if they don't exist. Safe to run multiple times."""
+    from database.models import Base
+    try:
+        with engine.connect() as conn:
+            # Enable pgvector for AI search (no-op if already enabled)
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.commit()
+        # Create all ORM-defined tables (schemes, users, etc.)
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database schema initialized (tables ready).")
+    except Exception as e:
+        print(f"⚠️  Schema init warning: {e}")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
