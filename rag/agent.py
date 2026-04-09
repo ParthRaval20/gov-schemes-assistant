@@ -353,6 +353,17 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
         base_k = 15 if intent == "names_only" else 5
         fetch_k = max(limit or base_k, base_k) + len(prev_names)
         schemes = fetch_schemes(question_en, chat_history, k=fetch_k, last_schemes=session["last_schemes"], minimal_extraction=(intent == "names_only"))
+        
+        # ── Prevent Hallucinations (Echoing the Prompt) ──
+        q_lower_strip = question.lower().strip()
+        q_en_lower_strip = question_en.lower().strip()
+        cleaned = []
+        for s in schemes:
+            s_name = (s.scheme_name if hasattr(s, "scheme_name") else s.get("scheme_name", "")).strip()
+            if s_name and s_name.lower() not in (q_lower_strip, q_en_lower_strip):
+                cleaned.append(s)
+        schemes = cleaned
+        
         if fresh and prev_names:
             schemes = [s for s in schemes if s.scheme_name not in prev_names]
         session["last_schemes"] = schemes
@@ -360,6 +371,12 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
 
     if intent == "names_only":
         selected = schemes[:limit] if limit else schemes
+        if not selected:
+            reply = reply_in_lang(ls("no_schemes_found"))
+            save_to_history(session_id, question, reply)
+            yield {"type": "conversational", "reply": reply, "lang": lang}
+            return
+            
         names_text = "\n".join(f"{i+1}. {s.scheme_name}" for i, s in enumerate(selected))
         names_text += "\n\n💡 Ask me for full details of any scheme above."
         reply = reply_in_lang(names_text)
