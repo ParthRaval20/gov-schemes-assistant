@@ -67,9 +67,63 @@ def extract_search_topic(question: str) -> str:
     return " ".join(core) if core else question
 
 
+def _sql_fallback_search(query: str, k: int = 5):
+    """
+    Fallback: search the relational 'schemes' table using ILIKE keywords
+    when vector search returns empty (e.g. documents table is empty).
+    Returns list of Document objects matching the format expected by the RAG pipeline.
+    """
+    from langchain_core.documents import Document
+    try:
+        from database.db import SessionLocal
+        from database.models import Scheme
+        from sqlalchemy import or_
+        
+        session = SessionLocal()
+        keywords = [w.strip() for w in query.lower().split() if len(w.strip()) > 2]
+        
+        if not keywords:
+            # Just return top k schemes
+            schemes = session.query(Scheme).limit(k).all()
+        else:
+            # Build ILIKE filters for each keyword across multiple columns
+            filters = []
+            for kw in keywords:
+                pattern = f"%{kw}%"
+                filters.append(Scheme.scheme_name.ilike(pattern))
+                filters.append(Scheme.category.ilike(pattern))
+                filters.append(Scheme.description.ilike(pattern))
+                filters.append(Scheme.benefits.ilike(pattern))
+                filters.append(Scheme.eligibility.ilike(pattern))
+            
+            schemes = session.query(Scheme).filter(or_(*filters)).limit(k).all()
+        
+        docs = []
+        for s in schemes:
+            text = (
+                f"\n    Scheme name :{s.scheme_name}\n"
+                f"    Description :{s.description or 'Not found'}\n"
+                f"    category : {s.category or ''}\n"
+                f"    benefits : {s.benefits or 'Not found'}\n"
+                f"    eligibility : {s.eligibility or 'Not found'}\n"
+                f"    application_process : {s.application_process or 'Not found'}\n"
+                f"    required_documents : {s.documents_required or 'Not found'}\n"
+                f"    state : {s.state or 'Gujarat'}\n"
+                f"    Link : {s.application_link or ''}\n\n    "
+            )
+            docs.append(Document(page_content=text, metadata={}))
+        
+        session.close()
+        print(f"🔄 SQL fallback returned {len(docs)} documents for: {query[:60]}")
+        return docs
+    except Exception as e:
+        print(f"❌ SQL fallback error: {e}")
+        return []
+
+
 def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: list = None, minimal_extraction: bool = False) -> List[SchemeOutput]:
     """
-    Fetches schemes from vector DB.
+    Fetches schemes from vector DB with SQL fallback.
     rewrite_question + DB search run in PARALLEL — saves ~6s when rewrite needs LLM.
     For fresh topic queries, rewrite returns instantly (no LLM), so no waiting.
     """
@@ -96,6 +150,12 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
     # If rewrite actually changed the query, re-run DB search with the better query
     if not specific_name and standalone.lower().strip() != question.lower().strip():
         docs = _do_search(standalone, k)
+
+    # ── SQL FALLBACK: If vector search returns nothing, use relational DB ──
+    if not docs:
+        print("⚠️ Vector search returned 0 docs — falling back to SQL keyword search...")
+        fallback_query = specific_name or search_query or question
+        docs = _sql_fallback_search(fallback_query, k)
 
     context = format_docs(docs)
 
