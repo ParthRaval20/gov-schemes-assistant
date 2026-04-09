@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import warnings
 import uuid
 import os
@@ -16,6 +19,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import SessionLocal
 from database.models import User, ChatHistory, Notification
 from utils.notifier import broadcast_new_schemes
+from sqlalchemy import text
 try:
     from bot.telegram_handler import start_telegram_bot, handle_webhook_update
 except Exception:
@@ -26,11 +30,7 @@ import requests
 from twilio.twiml.messaging_response import MessagingResponse
 
 warnings.filterwarnings("ignore")
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ModuleNotFoundError:
-    pass
+# load_dotenv() moved to the top
 
 app = Flask(__name__)
 app.secret_key = "your-secret-key-change-this"  # Change this in production
@@ -786,6 +786,37 @@ async def telegram_webhook():
     except Exception as e:
         print(f"Telegram Webhook Error: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/status")
+def status():
+    """Diagnostic route to check bot and environment status."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    db_status = "Connected"
+    try:
+        from database.db import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"Error: {e}"
+
+    # Check Telegram Webhook Status
+    tg_webhook_info = "Unknown"
+    if token:
+        try:
+            tg_res = requests.get(f"https://api.telegram.org/bot{token}/getWebhookInfo").json()
+            tg_webhook_info = tg_res.get("result", tg_res)
+        except Exception as e:
+            tg_webhook_info = f"Error: {e}"
+
+    return jsonify({
+        "bot_initialized": (handle_webhook_update is not None),
+        "telegram_token_present": bool(token),
+        "database_status": db_status,
+        "current_request_host": request.host,
+        "vercel_url_env": os.getenv("VERCEL_URL"),
+        "telegram_webhook_info": tg_webhook_info,
+        "setup_url": f"{request.url_root.rstrip('/')}/set_telegram_webhook"
+    })
 
 @app.route("/set_telegram_webhook", methods=["GET"])
 def set_telegram_webhook():
