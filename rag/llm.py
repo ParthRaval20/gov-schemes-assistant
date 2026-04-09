@@ -1,5 +1,6 @@
 import os
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -53,6 +54,45 @@ class QueryPreprocessor(BaseModel):
     profile: Optional[UserProfile] = Field(None)
 
 # -------------------------------------------------
+# Custom Supabase Direct Retriever
+# Bypasses langchain-community's SupabaseVectorStore which has broken
+# compatibility with supabase-py v2.x (SyncRPCFilterRequestBuilder API change).
+# Calls the match_documents RPC directly — works with any supabase-py v2 version.
+# -------------------------------------------------
+
+class _SupabaseDirectRetriever:
+    """Thin wrapper around the Supabase pgvector RPC — no langchain-community needed."""
+
+    def __init__(self, client, embedding, query_name: str):
+        self._client = client
+        self._embedding = embedding
+        self._query_name = query_name
+
+    def _similarity_search(self, query: str, k: int = 5):
+        query_embedding = self._embedding.embed_query(query)
+        result = self._client.rpc(
+            self._query_name,
+            {"query_embedding": query_embedding, "match_count": k},
+        ).execute()
+        docs = []
+        for row in (result.data or []):
+            content = row.get("content", "")
+            meta = {key: val for key, val in row.items() if key not in ("content", "embedding")}
+            docs.append(Document(page_content=content, metadata=meta))
+        return docs
+
+    def as_retriever(self, search_kwargs=None):
+        k = (search_kwargs or {}).get("k", 5)
+        parent = self
+
+        class _Ret:
+            def invoke(self_, query: str):
+                return parent._similarity_search(query, k)
+
+        return _Ret()
+
+
+# -------------------------------------------------
 # Lazy Loaders
 # -------------------------------------------------
 
@@ -74,7 +114,6 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         print("⏳ Loading Mistral embedding model (API)...")
-        # Use Mistral API for embeddings to save bundle size on Vercel
         _embedding_model = MistralAIEmbeddings(model="mistral-embed")
         print("✅ Mistral embeddings ready.")
     return _embedding_model
@@ -84,34 +123,36 @@ def get_vector_db():
     if _vector_db is None:
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        
+
         if supabase_url and supabase_key:
-            print("🌐 Connecting to Supabase Vector Store via API...")
-            from supabase.client import create_client
-            from langchain_community.vectorstores import SupabaseVectorStore
-            
+            print("🌐 Connecting directly to Supabase pgvector RPC...")
             try:
+                from supabase import create_client
                 supabase_client = create_client(supabase_url, supabase_key)
-                _vector_db = SupabaseVectorStore(
+                _vector_db = _SupabaseDirectRetriever(
                     client=supabase_client,
                     embedding=get_embedding_model(),
-                    table_name="documents",
                     query_name="match_documents",
                 )
-                print("✅ Supabase Vector Store ready.")
+                print("✅ Supabase direct retriever ready.")
             except Exception as e:
-                print(f"⚠️ Warning: Supabase client failed: {e}. Falling back to local.")
-        
+                print(f"❌ Supabase connection failed: {e}")
+        else:
+            print("⚠️  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — trying local Chroma fallback.")
+
         if _vector_db is None:
             print("📂 Using local Chroma Vector Store (Fallback)...")
             try:
                 from langchain_community.vectorstores import Chroma
-                # Support both relative and absolute paths for vector_db
                 persist_dir = os.path.join(os.getcwd(), "vector_db")
                 _vector_db = Chroma(persist_directory=persist_dir, embedding_function=get_embedding_model())
+                print("✅ Local Chroma ready.")
             except Exception as e:
-                print(f"❌ ChromaDB fallback failed: {e}")
-                return None
+                print(f"❌ ChromaDB fallback also failed: {e}")
+                raise RuntimeError(
+                    "No vector store available. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY "
+                    "in Vercel env vars, or ensure local vector_db/ exists."
+                ) from e
     return _vector_db
 
 def get_llm():
