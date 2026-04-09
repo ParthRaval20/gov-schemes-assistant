@@ -207,12 +207,19 @@ async def handle_webhook_update(update_json: dict):
             await _telegram_app.initialize()
             _app_initialized = True
             
-        print(f"DEBUG: Processing Telegram update: {update_json.get('update_id')}")
+        print(f"DEBUG: Webhook Update ID: {update_json.get('update_id')}")
         update = Update.de_json(update_json, _telegram_app.bot)
+        
+        # Log message content for debugging
+        if update.message and update.message.text:
+            print(f"DEBUG: Message from {update.effective_chat.id}: {update.message.text}")
+        elif update.message and update.message.voice:
+            print(f"DEBUG: Voice message from {update.effective_chat.id}")
+
         await _telegram_app.process_update(update)
-        print("DEBUG: Telegram update processed successfully.")
+        print("DEBUG: Update processed successfully.")
     except Exception as e:
-        print(f"Error processing Telegram update: {e}")
+        print(f"Error in handle_webhook_update: {e}")
 
 def start_telegram_bot():
     """Starts the bot in polling mode (for local testing)."""
