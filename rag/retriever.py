@@ -7,26 +7,24 @@ from rag.llm import get_vector_db, get_structured_llm, get_minimal_structured_ll
 from rag.utils import format_docs, scheme_name_similarity
 from rag.intent import is_direct_scheme_name_query, rewrite_question
 
-EXTRACTION_SYSTEM = """You are an AI assistant for Gujarat government schemes.
+EXTRACTION_SYSTEM = """You are a precise data extractor for government schemes. 
+Your ONLY task is to extract exact scheme names from the provided context.
 
-Rules for Extraction:
-1. For 'application_process', ALWAYS refactor messy blocks into a clean, numbered list (1, 2, 3...) with one step per line.
-2. For 'benefits' and 'eligibility', use clear bullet points (•) if there are multiple distinct points.
-3. Remove redundant filler phrases like "click here", "click", "visit link", or "here" from all fields. We display links separately as a dedicated button.
-4. Copy values from the context but ensure they are STRUCTURED for readability.
-5. Keep scheme names, state names, and acronyms like SC/ST/OBC exactly as found.
-6. Only use 'Not Available' if truly absent.
+CRITICAL RULES:
+1. ONLY extract schemes that are explicitly listed as a value after a "Scheme name:" label or similar clear identifier.
+2. NEVER extract the labels themselves (e.g., do NOT extract "Scheme name", "Description", "Benefits", "Eligibility" as scheme names).
+3. If no specific scheme is found in the context that matches the user's intent, return an empty list.
+4. Do NOT invent or hallucinate scheme names.
+5. Do NOT return the user's question or topic as a scheme name.
+6. Return the results in the required JSON format.
 
-Map document fields:
-  "Scheme name"         → scheme_name
-  "Description"         → description
-  "category"            → category
-  "benefits"            → benefits
-  "eligibility"         → eligibility
-  "application_process" → application_process
-  "required_documents"  → documents_required
-  "state"               → state
-  "Link"                → official_link
+RULES FOR FULL EXTRACTION:
+- For 'application_process', ALWAYS refactor messy blocks into a clean, numbered list (1, 2, 3...) with one step per line.
+- For 'benefits' and 'eligibility', use clear bullet points (•) if there are multiple distinct points.
+- Remove redundant filler phrases like "click here", "click", "visit link", or "here" from all fields.
+- Copy values from the context but ensure they are STRUCTURED for readability.
+- Keep scheme names, state names, and acronyms like SC/ST/OBC exactly as found.
+- Only use 'Not Available' if truly absent.
 """
 
 
@@ -101,15 +99,15 @@ def _sql_fallback_search(query: str, k: int = 5):
         docs = []
         for s in schemes:
             text = (
-                f"\n    Scheme name :{s.scheme_name}\n"
-                f"    Description :{s.description or 'Not found'}\n"
-                f"    category : {s.category or ''}\n"
-                f"    benefits : {s.benefits or 'Not found'}\n"
-                f"    eligibility : {s.eligibility or 'Not found'}\n"
-                f"    application_process : {s.application_process or 'Not found'}\n"
-                f"    required_documents : {s.documents_required or 'Not found'}\n"
-                f"    state : {s.state or 'Gujarat'}\n"
-                f"    Link : {s.application_link or ''}\n\n    "
+                f"Scheme name: {s.scheme_name}\n"
+                f"Description: {s.description or 'Not found'}\n"
+                f"Category: {s.category or ''}\n"
+                f"Benefits: {s.benefits or 'Not found'}\n"
+                f"Eligibility: {s.eligibility or 'Not found'}\n"
+                f"Application Process: {s.application_process or 'Not found'}\n"
+                f"Documents Required: {s.documents_required or 'Not found'}\n"
+                f"State: {s.state or 'Gujarat'}\n"
+                f"Official Link: {s.application_link or ''}\n"
             )
             docs.append(Document(page_content=text, metadata={}))
         
@@ -169,10 +167,10 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
     prompt = ChatPromptTemplate.from_messages([
         ("system", system),
         ("placeholder", "{chat_history}"),
-        ("human", "Based on the Question, safely extract government scheme names strictly from the Context below. CRITICAL RULES:\n1. Do NOT invent schemes.\n2. Do NOT return the user's question as a scheme name.\n3. ONLY extract schemes from the Context that actually match the topic or category requested in the Question.\n4. If the Context contains completely unrelated schemes, IGNORE them.\n5. If no schemes in the Context are relevant to the Question, return an empty list.\n\nContext:\n{context}\n\nQuestion: {question}")
+        ("human", "Context:\n{context}\n\nQuestion: {question}")
     ])
     
-    # \u2500\u2500 SPEED OPTIMIZATION: Branching Logic \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    # ── SPEED OPTIMIZATION: Branching Logic ──────────────────────────────────────────
     # If minimal_extraction=True, we use get_minimal_structured_llm().
     # This instructs the AI to ONLY find names, cutting generation time by 75%.
     if minimal_extraction:
