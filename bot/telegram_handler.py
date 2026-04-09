@@ -188,17 +188,22 @@ def create_telegram_app():
     return app
 
 _telegram_app = create_telegram_app()
+_app_initialized = False
 
 async def handle_webhook_update(update_json: dict):
-    """Processes a single update received via webhook using an async context manager."""
+    """Processes a single update received via webhook."""
+    global _app_initialized
     if not _telegram_app:
         return
     
     try:
+        if not _app_initialized:
+            await _telegram_app.initialize()
+            _app_initialized = True
+            
         print(f"DEBUG: Processing Telegram update: {update_json.get('update_id')}")
-        async with _telegram_app:
-            update = Update.de_json(update_json, _telegram_app.bot)
-            await _telegram_app.process_update(update)
+        update = Update.de_json(update_json, _telegram_app.bot)
+        await _telegram_app.process_update(update)
         print("DEBUG: Telegram update processed successfully.")
     except Exception as e:
         print(f"Error processing Telegram update: {e}")
