@@ -234,8 +234,6 @@ def text_to_speech():
         # Run the async function from sync Flask
         asyncio.run(generate_speech(text, lang, temp_path))
         
-        # We send the file and delete it after sending? 
-        # Actually send_file sends it. We might need a cleanup mechanism but let's send first.
         return send_file(temp_path, mimetype="audio/mpeg")
         
     except Exception as e:
@@ -826,12 +824,14 @@ def set_telegram_webhook():
         return jsonify({"error": "TELEGRAM_BOT_TOKEN not set in environment"}), 400
     
     # 1. Determine the domain
-    # Use NGROK_URL from .env if it looks valid
-    ngrok_env = os.getenv("NGROK_URL", "")
-    if "ngrok-free.dev" in ngrok_env:
-        domain = ngrok_env.split(" -> ")[0].strip()
-    else:
-        domain = os.getenv("VERCEL_URL") or request.host
+    # Use VERCEL_URL or request.host as the primary source (Live Environment)
+    domain = os.getenv("VERCEL_URL") or request.host
+
+    # Only fallback to NGROK_URL if we are on localhost (Local Development)
+    if "localhost" in domain or "127.0.0.1" in domain:
+        ngrok_env = os.getenv("NGROK_URL", "")
+        if "ngrok-free.dev" in ngrok_env:
+            domain = ngrok_env.split(" -> ")[0].strip()
 
     # 2. Build the full webhook URL
     if not domain.startswith("http"):
