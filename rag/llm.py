@@ -1,6 +1,5 @@
 import os
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
-from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -114,6 +113,7 @@ def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
         print("⏳ Loading Mistral embedding model (API)...")
+        # Use Mistral API for embeddings to save bundle size on Vercel
         _embedding_model = MistralAIEmbeddings(model="mistral-embed")
         print("✅ Mistral embeddings ready.")
     return _embedding_model
@@ -123,36 +123,34 @@ def get_vector_db():
     if _vector_db is None:
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
+        
         if supabase_url and supabase_key:
-            print("🌐 Connecting directly to Supabase pgvector RPC...")
+            print("🌐 Connecting to Supabase Vector Store via API...")
+            from supabase.client import create_client
+            from langchain_community.vectorstores import SupabaseVectorStore
+            
             try:
-                from supabase import create_client
                 supabase_client = create_client(supabase_url, supabase_key)
-                _vector_db = _SupabaseDirectRetriever(
+                _vector_db = SupabaseVectorStore(
                     client=supabase_client,
                     embedding=get_embedding_model(),
+                    table_name="documents",
                     query_name="match_documents",
                 )
-                print("✅ Supabase direct retriever ready.")
+                print("✅ Supabase Vector Store ready.")
             except Exception as e:
-                print(f"❌ Supabase connection failed: {e}")
-        else:
-            print("⚠️  SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — trying local Chroma fallback.")
-
+                print(f"⚠️ Warning: Supabase client failed: {e}. Falling back to local.")
+        
         if _vector_db is None:
             print("📂 Using local Chroma Vector Store (Fallback)...")
             try:
                 from langchain_community.vectorstores import Chroma
+                # Support both relative and absolute paths for vector_db
                 persist_dir = os.path.join(os.getcwd(), "vector_db")
                 _vector_db = Chroma(persist_directory=persist_dir, embedding_function=get_embedding_model())
-                print("✅ Local Chroma ready.")
             except Exception as e:
-                print(f"❌ ChromaDB fallback also failed: {e}")
-                raise RuntimeError(
-                    "No vector store available. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY "
-                    "in Vercel env vars, or ensure local vector_db/ exists."
-                ) from e
+                print(f"❌ ChromaDB fallback failed: {e}")
+                return None
     return _vector_db
 
 def get_llm():

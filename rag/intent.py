@@ -45,8 +45,10 @@ def detect_intent(question: str, chat_history: list, awaiting_profile: bool) -> 
 
     words = q.split()
     if len(words) <= 5 and not awaiting_profile:
-        if any(w in q for w in ["scheme", "yojana", "scholarship", "loan", "plan", "program", "subsidy", "welfare"]):
-            return "names_only"
+        # Prevent "tell me about EBC scholarship" from being incorrectly marked as names_only
+        if not any(w in q for w in ["about", "detail", "details", "explain", "what"]):
+            if any(w in q for w in ["scheme", "yojana", "scholarship", "loan", "plan", "program", "subsidy", "welfare"]):
+                return "names_only"
 
     if awaiting_profile:
         profile_keywords = [

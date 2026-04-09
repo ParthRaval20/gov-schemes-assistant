@@ -109,7 +109,7 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
     prompt = ChatPromptTemplate.from_messages([
         ("system", system),
         ("placeholder", "{chat_history}"),
-        ("human", "Extract ALL schemes from context. Copy values exactly.\n\nContext:\n{context}\n\nQuestion: {question}")
+        ("human", "Based on the Question, extract ALL relevant government scheme names strictly from the Context below. CRITICAL: Do NOT invent schemes. Do NOT return the user's question as a scheme name. If no schemes match, return an empty list.\n\nContext:\n{context}\n\nQuestion: {question}")
     ])
     
     # \u2500\u2500 SPEED OPTIMIZATION: Branching Logic \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
