@@ -90,7 +90,7 @@ def send_whatsapp_notification(phone_number, message):
         log.error(f"❌ WhatsApp error ({phone_number}): {e}")
         return False
 
-def broadcast_new_schemes(new_scheme_names, is_update=False):
+def broadcast_new_schemes(new_scheme_names, is_update=False, is_delete=False):
     """
     1. Creates a Notification record in DB.
     2. Sends email alerts to all subscribed users.
@@ -102,20 +102,37 @@ def broadcast_new_schemes(new_scheme_names, is_update=False):
     title = f"📢 {count} New Government Scheme{'s' if count > 1 else ''} Added!"
     if is_update:
         title = f"✨ {count} Scheme{'s' if count > 1 else ''} Updated with New Details!"
+    elif is_delete:
+        title = f"🗑️ {count} Scheme{'s' if count > 1 else ''} Removed from Portal"
 
     scheme_list_str = "\n".join([f"• {name}" for name in new_scheme_names])
     scheme_list_html = "<ul>" + "".join([f"<li>{name}</li>" for name in new_scheme_names]) + "</ul>"
     
-    action_text = "found" if not is_update else "updated"
+    if is_delete:
+        action_text = "removed"
+    elif is_update:
+        action_text = "updated"
+    else:
+        action_text = "found"
+
     message = f"Namaste,\n\nWe have {action_text} {count} government scheme{'s' if count > 1 else ''} for Gujarat with new information:\n\n{scheme_list_str}\n\nCheck your eligibility now at: {APP_URL}/\n\nTeam Yojana AI"
+    if is_delete:
+        message = f"Namaste,\n\nThe following {count} government scheme{'s' if count > 1 else ''} are no longer available on the official portal and have been removed from our database:\n\n{scheme_list_str}\n\nExplore other schemes at: {APP_URL}/\n\nTeam Yojana AI"
 
     # 1. Create DB Notification
     db = SessionLocal()
     try:
+        if is_delete:
+            notif_type = "delete_scheme"
+        elif is_update:
+            notif_type = "update_scheme"
+        else:
+            notif_type = "new_scheme"
+
         new_notif = Notification(
             title=title,
             message=f"Schemes {action_text}: {', '.join(new_scheme_names[:3])}{'...' if count > 3 else ''}",
-            type="new_scheme" if not is_update else "update_scheme",
+            type=notif_type,
             created_at=datetime.utcnow()
         )
         db.add(new_notif)
@@ -127,19 +144,23 @@ def broadcast_new_schemes(new_scheme_names, is_update=False):
         log.info(f"🚀 Broadcasting {'updates' if is_update else 'new schemes'} to {len(users)} users...")
 
         for user in users:
+            intro_text = f"We have just {'discovered' if not is_update else 'updated'} <strong>{count} government scheme{'s' if count > 1 else ''}</strong> that might be relevant to you:"
+            if is_delete:
+                intro_text = f"The following <strong>{count} government scheme{'s' if count > 1 else ''}</strong> have been removed from the official portal:"
+
             html_content = f"""
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 2px solid #FF9933; padding: 25px; border-radius: 12px; max-width: 600px; margin: auto;">
                 <h2 style="color: #000080; text-align: center;">Yojana AI Alert</h2>
                 <hr style="border: 1px solid #138808; margin-bottom: 20px;">
                 <p>Namaste <strong>{user.full_name}</strong>,</p>
                 <p style="font-size: 16px; color: #333; line-height: 1.6;">
-                    We have just {"discovered" if not is_update else "updated"} <strong>{count} government scheme{'s' if count > 1 else ''}</strong> that might be relevant to you:
+                    {intro_text}
                 </p>
                 <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #FF9933; margin: 20px 0;">
                     {scheme_list_html}
                 </div>
                 <div style="text-align: center; margin-top: 30px;">
-                    <a href="{APP_URL}/" style="display: inline-block; padding: 12px 25px; background-color: #FF9933; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: background 0.3s;">🚀 Check My Eligibility</a>
+                    <a href="{APP_URL}/" style="display: inline-block; padding: 12px 25px; background-color: #FF9933; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: background 0.3s;">🚀 {'Explore Other Schemes' if is_delete else 'Check My Eligibility'}</a>
                 </div>
                 <p style="font-size: 12px; color: #777; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px;">
                     You are receiving this because you signed up for Gujarat Government Scheme alerts. 

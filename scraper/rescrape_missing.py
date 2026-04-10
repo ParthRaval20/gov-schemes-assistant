@@ -85,6 +85,24 @@ def extract_fields_with_llm(page_text: str, scheme_name: str) -> dict:
         return {}
 
     llm    = get_llm()
+    
+    # ── JSON Robustness Helper ──────────────────────────────────────────
+    def clean_json_text(text: str) -> str:
+        # 1. Remove markdown backticks
+        text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+        
+        # 2. Find first { and last }
+        start = text.find('{')
+        end   = text.rfind('}')
+        if start != -1 and end != -1:
+            text = text[start:end+1]
+            
+        # 3. Basic cleanup for common LLM hallucinations
+        # Remove trailing commas before closing braces/brackets
+        text = re.sub(r',\s*([\]}])', r'\1', text)
+        return text.strip()
+
     prompt = f"""Extract information about the government scheme "{scheme_name}" from this webpage text.
 
 Webpage text:
@@ -109,9 +127,7 @@ JSON:"""
     for attempt in range(1, 4):
         try:
             response = llm.invoke(prompt)
-            raw      = response.content.strip()
-            raw      = re.sub(r'^```(?:json)?\s*', '', raw)
-            raw      = re.sub(r'\s*```$', '', raw)
+            raw      = clean_json_text(response.content.strip())
             return json.loads(raw)
         except Exception as e:
             err_str = str(e).lower()
@@ -233,14 +249,15 @@ def main():
 
     # ── Find schemes with missing data ───────────────────────────────────────
     missing = get_missing_schemes()
-    print(f"📋 Found {len(missing)} schemes with missing details in Cloud DB\n")
+    success       = 0
+    failed        = []
+    updated_names = []
+
+    print(f"📋 Found {len(missing)} schemes with missing details in Cloud DB")
 
     if not missing:
         print("🎉 Nothing to fix! All schemes have complete data.")
         return
-
-    success = 0
-    failed  = []
 
     for i, scheme in enumerate(missing, 1):
         name = scheme["name"]
@@ -291,6 +308,7 @@ def main():
         print(f"  💾 Updating Cloud Database...")
         update_cloud_db(scheme["id"], fields, new_doc)
         success += 1
+        updated_names.append(name)
 
         print(f"  ✅ Done\n")
         time.sleep(BATCH_DELAY)
@@ -302,13 +320,13 @@ def main():
         print(f"❌ Failed ({len(failed)}):")
         for f in failed:
             print(f"   - {f}")
-    
-    if success > 0:
-        updated_names = [s["name"] for s in missing if s["name"] not in failed]
-        print(f"\n📢 Broadcasting updates for {len(updated_names)} schemes...")
+            
+    # Broadcast notification if any schemes were recovered
+    if updated_names:
+        from utils.notifier import broadcast_new_schemes
         broadcast_new_schemes(updated_names, is_update=True)
-
-    print("\n🎉 Re-scraping complete!")
+        
+    print("🎉 Re-scraping complete!")
 
 
 if __name__ == "__main__":

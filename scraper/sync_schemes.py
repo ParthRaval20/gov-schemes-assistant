@@ -69,10 +69,10 @@ BASE_URL        = "https://www.myscheme.gov.in/search/state/Gujarat"
 SCHEME_BASE     = "https://www.myscheme.gov.in/schemes/"
 STATE_NAME      = "Gujarat"
 PAGE_SIZE       = 10
-NAV_TIMEOUT     = 60_000
+NAV_TIMEOUT     = 90_000
 
 # ── Fix 3: Increased from 20 → 30 ────────────────────────────────────────────
-API_WAIT        = 30
+API_WAIT        = 45
 
 # ── Fix 2: Increased from 3 → 5 ──────────────────────────────────────────────
 MAX_RETRIES     = 5
@@ -310,6 +310,27 @@ def scrape_live_scheme_list() -> dict:
                 failed_pages.append(page_no)
 
             time.sleep(0.5)
+
+        # ── EXTRA RETRY PASS for failed pages ───────────────────────────
+        if failed_pages:
+            log.info(f"   🔄 Retrying {len(failed_pages)} failed pages with 10s delay...")
+            for page_no in failed_pages[:]:
+                offset = (page_no - 1) * PAGE_SIZE
+                state.update(target_offset=offset, api_body=None, api_done=False)
+                
+                time.sleep(10)
+                try:
+                    bpage.reload(wait_until="networkidle", timeout=NAV_TIMEOUT)
+                except Exception:
+                    pass
+
+                if _wait_for(state, "api_done", API_WAIT) and state["api_body"]:
+                    batch = _extract_schemes_from_api(state["api_body"])
+                    if batch:
+                        for s in batch:
+                            all_schemes[s["slug"]] = s
+                        log.info(f"   ✅ Recovered Page {page_no}")
+                        failed_pages.remove(page_no)
 
         browser.close()
 
@@ -674,9 +695,14 @@ def run_sync():
     # ── Step 3: Delete only CONFIRMED removed schemes ────────────────────────
     if confirmed_delete:
         log.info(f"\n🗑️  Deleting {len(confirmed_delete)} confirmed removed scheme(s) …")
+        deleted_names = []
         for slug in confirmed_delete:
             scheme_name = slug.replace("-", " ").title()
             delete_from_cloud_db(slug, scheme_name)
+            deleted_names.append(scheme_name)
+        
+        if deleted_names:
+            broadcast_new_schemes(deleted_names, is_delete=True)
     else:
         log.info("\n✅ No confirmed deletions this run.")
 
