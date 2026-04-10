@@ -19,8 +19,6 @@ def sync_secrets():
         "SUPABASE_SERVICE_ROLE_KEY",
         "MISTRAL_API_KEY",
         "GROQ_API_KEY",
-        "EMAIL_USER",
-        "EMAIL_PASS",
         "DB_USERNAME",
         "DB_PASSWORD",
         "DB_HOSTNAME",
