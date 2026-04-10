@@ -67,6 +67,11 @@ jobs:
           DB_HOSTNAME: ${{ secrets.DB_HOSTNAME }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SENDER: ${{ secrets.SMTP_SENDER }}
         run: |
           export PYTHONPATH=$PYTHONPATH:.
           python3 scraper/rescrape_missing.py || echo "Rescrape failed or skipped"

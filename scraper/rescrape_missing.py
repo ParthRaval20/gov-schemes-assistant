@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from database.db import SessionLocal
 from database.models import Scheme
 from rag.llm import get_vector_db, get_embedding_model
+from utils.notifier import broadcast_new_schemes
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -301,6 +302,12 @@ def main():
         print(f"❌ Failed ({len(failed)}):")
         for f in failed:
             print(f"   - {f}")
+    
+    if success > 0:
+        updated_names = [s["name"] for s in missing if s["name"] not in failed]
+        print(f"\n📢 Broadcasting updates for {len(updated_names)} schemes...")
+        broadcast_new_schemes(updated_names, is_update=True)
+
     print("\n🎉 Re-scraping complete!")
 
 

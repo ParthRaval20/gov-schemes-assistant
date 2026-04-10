@@ -22,6 +22,7 @@ load_dotenv()
 # Logger setup
 log = logging.getLogger("notifier")
 logging.basicConfig(level=logging.INFO)
+APP_URL = os.getenv("APP_URL", "https://yojana-ai-seven.vercel.app").rstrip("/")
 
 def send_email(to_email, subject, body_html, body_text=None):
     """Sends a single HTML email using SMTP."""
@@ -89,7 +90,7 @@ def send_whatsapp_notification(phone_number, message):
         log.error(f"❌ WhatsApp error ({phone_number}): {e}")
         return False
 
-def broadcast_new_schemes(new_scheme_names):
+def broadcast_new_schemes(new_scheme_names, is_update=False):
     """
     1. Creates a Notification record in DB.
     2. Sends email alerts to all subscribed users.
@@ -99,18 +100,22 @@ def broadcast_new_schemes(new_scheme_names):
 
     count = len(new_scheme_names)
     title = f"📢 {count} New Government Scheme{'s' if count > 1 else ''} Added!"
+    if is_update:
+        title = f"✨ {count} Scheme{'s' if count > 1 else ''} Updated with New Details!"
+
     scheme_list_str = "\n".join([f"• {name}" for name in new_scheme_names])
     scheme_list_html = "<ul>" + "".join([f"<li>{name}</li>" for name in new_scheme_names]) + "</ul>"
     
-    message = f"Namaste,\n\nWe have found {count} new government scheme{'s' if count > 1 else ''} for Gujarat:\n\n{scheme_list_str}\n\nCheck your eligibility now at: http://127.0.0.1:5000/\n\nTeam Yojana AI"
+    action_text = "found" if not is_update else "updated"
+    message = f"Namaste,\n\nWe have {action_text} {count} government scheme{'s' if count > 1 else ''} for Gujarat with new information:\n\n{scheme_list_str}\n\nCheck your eligibility now at: {APP_URL}/\n\nTeam Yojana AI"
 
     # 1. Create DB Notification
     db = SessionLocal()
     try:
         new_notif = Notification(
             title=title,
-            message=f"New schemes added: {', '.join(new_scheme_names[:3])}{'...' if count > 3 else ''}",
-            type="new_scheme",
+            message=f"Schemes {action_text}: {', '.join(new_scheme_names[:3])}{'...' if count > 3 else ''}",
+            type="new_scheme" if not is_update else "update_scheme",
             created_at=datetime.utcnow()
         )
         db.add(new_notif)
@@ -119,7 +124,7 @@ def broadcast_new_schemes(new_scheme_names):
         
         # 2. Get all users with notifications enabled
         users = db.query(User).filter(User.email_notifications == 1).all()
-        log.info(f"🚀 Broadcasting new schemes to {len(users)} users...")
+        log.info(f"🚀 Broadcasting {'updates' if is_update else 'new schemes'} to {len(users)} users...")
 
         for user in users:
             html_content = f"""
@@ -128,13 +133,13 @@ def broadcast_new_schemes(new_scheme_names):
                 <hr style="border: 1px solid #138808; margin-bottom: 20px;">
                 <p>Namaste <strong>{user.full_name}</strong>,</p>
                 <p style="font-size: 16px; color: #333; line-height: 1.6;">
-                    We have just discovered <strong>{count} new government scheme{'s' if count > 1 else ''}</strong> that might be relevant to you:
+                    We have just {"discovered" if not is_update else "updated"} <strong>{count} government scheme{'s' if count > 1 else ''}</strong> that might be relevant to you:
                 </p>
                 <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #FF9933; margin: 20px 0;">
                     {scheme_list_html}
                 </div>
                 <div style="text-align: center; margin-top: 30px;">
-                    <a href="http://127.0.0.1:5000/" style="display: inline-block; padding: 12px 25px; background-color: #FF9933; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: background 0.3s;">🚀 Check My Eligibility</a>
+                    <a href="{APP_URL}/" style="display: inline-block; padding: 12px 25px; background-color: #FF9933; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: background 0.3s;">🚀 Check My Eligibility</a>
                 </div>
                 <p style="font-size: 12px; color: #777; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px;">
                     You are receiving this because you signed up for Gujarat Government Scheme alerts. 
@@ -156,13 +161,13 @@ def broadcast_new_schemes(new_scheme_names):
             
             # --- Telegram Alert ---
             if user.telegram_chat_id:
-                tg_msg = f"📢 *{title}*\n\n{message}\n\nCheck now: http://127.0.0.1:5000/"
+                tg_msg = f"📢 *{title}*\n\n{message}\n\nCheck now: {APP_URL}/"
                 if send_telegram_notification(user.telegram_chat_id, tg_msg):
                     log.info(f"📲 Telegram notification sent to {user.full_name}")
             
             # --- WhatsApp Alert ---
             if user.whatsapp_number:
-                wa_msg = f"📢 *{title}*\n\n{message}\n\nCheck now: http://127.0.0.1:5000/"
+                wa_msg = f"📢 *{title}*\n\n{message}\n\nCheck now: {APP_URL}/"
                 if send_whatsapp_notification(user.whatsapp_number, wa_msg):
                     log.info(f"💬 WhatsApp notification sent to {user.full_name}")
 
