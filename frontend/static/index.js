@@ -111,32 +111,45 @@ function toggleAutoRead() {
 }
 
 async function speakText(text, btn, lang) {
+  // 1. Stop any current audio and clear ALL active highlights
   if (currentAudio) {
     currentAudio.pause();
     currentAudio = null;
-    // Clear any active highlighting
-    document.querySelectorAll('.bubble.reading').forEach(b => {
-      b.classList.remove('reading');
-      b.style.removeProperty('--read-progress');
-    });
+  }
 
-    if (btn && btn.dataset.speaking === '1') {
-      btn.dataset.speaking = '0';
-      btn.textContent = '🔊 Listen';
-      return;
+  // Clear highlights from ANY message
+  document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
+  document.querySelectorAll('.bubble.reading-active').forEach(b => b.classList.remove('reading-active'));
+
+  // Reset all other speaker buttons
+  document.querySelectorAll('.speak-btn').forEach(s => {
+    if (s !== btn) {
+      s.dataset.speaking = '0';
+      s.textContent = '🔊 Listen';
     }
+  });
+
+  // If clicked button was already speaking, just stop and return
+  if (btn && btn.dataset.speaking === '1') {
+    btn.dataset.speaking = '0';
+    btn.textContent = '🔊 Listen';
+    return;
   }
 
   const targetLang = lang || currentLang;
   const url = `/tts?text=${encodeURIComponent(text)}&lang=${targetLang}`;
-
   const audio = new Audio(url);
   currentAudio = audio;
 
-  // Find the bubble associated with this button (or response)
-  let bubble = null;
+  // Find the bubble or card associated with this button
+  let container = null;
   if (btn) {
-    bubble = btn.closest('.bubble') || btn.closest('.msg-row')?.querySelector('.bubble');
+    container = btn.closest('.bubble') || btn.closest('.scheme-card')?.querySelector('.scheme-body');
+  }
+
+  if (container) {
+    wrapWordsInBubble(container);
+    container.classList.add('reading-active');
   }
 
   if (btn) {
@@ -145,36 +158,40 @@ async function speakText(text, btn, lang) {
     
     audio.onplay = () => { 
       btn.textContent = '⏹ Stop'; 
-      if (bubble) bubble.classList.add('reading');
     };
 
-    audio.onended = () => {
-      btn.textContent = '🔊 Listen';
-      btn.dataset.speaking = '0';
-      if (bubble) {
-        bubble.classList.remove('reading');
-        bubble.style.removeProperty('--read-progress');
+    const cleanup = () => {
+      if (btn) {
+        btn.textContent = '🔊 Listen';
+        btn.dataset.speaking = '0';
       }
+      if (container) {
+        container.classList.remove('reading-active');
+        // keep spans for next time or unwrap? Unwrap is cleaner
+        // unwrapWordsInBubble(container); 
+      }
+      document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
       currentAudio = null;
     };
 
-    audio.onerror = () => {
-      btn.textContent = '🔊 Listen';
-      btn.dataset.speaking = '0';
-      if (bubble) {
-        bubble.classList.remove('reading');
-        bubble.style.removeProperty('--read-progress');
-      }
-      currentAudio = null;
-    };
+    audio.onended = cleanup;
+    audio.onerror = cleanup;
   }
 
-  // Handle Scanning Animation
+  // Word-by-word Timing Logic
   audio.ontimeupdate = () => {
-    if (bubble && audio.duration) {
-      const prog = (audio.currentTime / audio.duration) * 100;
-      bubble.style.setProperty('--read-progress', `${prog}%`);
-    }
+    if (!container || !audio.duration) return;
+    const words = container.querySelectorAll('.tts-word');
+    if (!words.length) return;
+
+    // Use total duration to find current word index
+    // We adjust the index slightly based on word count/time
+    const ratio = audio.currentTime / audio.duration;
+    const targetIdx = Math.floor(ratio * words.length);
+
+    words.forEach((w, i) => {
+      w.classList.toggle('active', i === targetIdx);
+    });
   };
 
   try {
@@ -184,7 +201,6 @@ async function speakText(text, btn, lang) {
     if (btn) {
       btn.textContent = '🔊 Listen';
       btn.dataset.speaking = '0';
-      if (bubble) bubble.classList.remove('reading');
     }
   }
 }
@@ -791,66 +807,43 @@ function renderResult(result) {
 
 // ── TTS word-wrap helpers (OBSOLETE with Audio TTS but kept for reference) ────
 function wrapWordsInBubble(el) {
-  // Only wrap text nodes that are direct or shallow children, skip buttons/links
+  if (!el || el.querySelector('.tts-word')) return; // Already wrapped or invalid
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const p = node.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
-      if (['BUTTON','A','SCRIPT','STYLE'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
-      if (p.classList.contains('tts-word')) return NodeFilter.FILTER_REJECT;
+      // Skip interactive or non-visible elements
+      if (['BUTTON','A','SCRIPT','STYLE','SPAN'].includes(p.tagName)) {
+         if (!p.classList.contains('field-value')) return NodeFilter.FILTER_REJECT;
+      }
+      if (p.classList.contains('tts-word') || p.classList.contains('step-marker') || p.classList.contains('bullet-marker')) return NodeFilter.FILTER_REJECT;
       if (node.textContent.trim() === '') return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     }
   });
   const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
+  let current;
+  while (current = walker.nextNode()) nodes.push(current);
+  
   nodes.forEach(node => {
-    const words = node.textContent.split(/(\s+)/);
-    const frag = document.createDocumentFragment();
-    words.forEach(part => {
+    const parent = node.parentNode;
+    const text = node.textContent;
+    // Split by whitespace but keep whitespace
+    const parts = text.split(/(\s+)/);
+    const fragment = document.createDocumentFragment();
+    
+    parts.forEach(part => {
       if (/^\s+$/.test(part)) {
-        frag.appendChild(document.createTextNode(part));
+        fragment.appendChild(document.createTextNode(part));
       } else if (part) {
         const span = document.createElement('span');
         span.className = 'tts-word';
         span.textContent = part;
-        frag.appendChild(span);
+        fragment.appendChild(span);
       }
     });
-    node.parentNode.replaceChild(frag, node);
+    parent.replaceChild(fragment, node);
   });
-}
-
-function formatStructuredText(text) {
-  if (!text || ['not available','n/a','none',''].includes(String(text).toLowerCase())) {
-    return `<span class="field-value" style="color:var(--muted)">Not available</span>`;
-  }
-
-  // Handle both literal \n and <br>
-  const lines = String(text).split(/\r?\n|<br>/).filter(l => l.trim().length > 0);
-  
-  if (lines.length <= 1 && !/^[0-9]+[\.\)]|^\s*[\•\-\*]/.test(text)) {
-    return `<span class="field-value">${escapeHtml(text)}</span>`;
-  }
-
-  let html = `<div class="structured-list">`;
-  lines.forEach(line => {
-    const trimmed = line.trim();
-    // Match Step 1:, 1., (1)
-    const stepMatch = trimmed.match(/^([0-9\u0AB0-\u0AB9]+[\.\)]|Step\s*[0-9]+[:\.]?|પગલું\s*[0-9]+[:\.]?|चरण\s*[0-9]+[:\.]?)\s*(.*)/i);
-    // Match •, *, -
-    const bulletMatch = trimmed.match(/^([\•\-\*])\s*(.*)/);
-
-    if (stepMatch) {
-      html += `<div class="list-item step"><span class="step-marker">${escapeHtml(stepMatch[1])}</span> ${escapeHtml(stepMatch[2])}</div>`;
-    } else if (bulletMatch) {
-      html += `<div class="list-item bullet"><span class="bullet-marker">●</span> ${escapeHtml(bulletMatch[2])}</div>`;
-    } else {
-      html += `<div class="list-item">${escapeHtml(trimmed)}</div>`;
-    }
-  });
-  html += `</div>`;
-  return html;
 }
 
 function unwrapWordsInBubble(el) {
@@ -858,7 +851,6 @@ function unwrapWordsInBubble(el) {
   el.querySelectorAll('.tts-word').forEach(span => {
     span.replaceWith(document.createTextNode(span.textContent));
   });
-  // Normalize merges adjacent text nodes
   el.normalize();
 }
 
@@ -906,7 +898,7 @@ function buildSchemeCard(s, i) {
       </div>
       <div class="divider"></div>
       <div class="scheme-field" style="grid-column: 1 / -1; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
-        <button class="speak-btn" id="${speakId}" data-speaking="0" style="margin-top:0">🔊 Listen to Details</button>
+        <button class="speak-btn" id="${speakId}" data-speaking="0" style="margin-top:0">🔊 Listen</button>
         <div class="scheme-field">
           <span class="field-label">Official Link</span>
           ${link}
@@ -917,7 +909,10 @@ function buildSchemeCard(s, i) {
       (function() {
         const btn = document.getElementById('${speakId}');
         if (btn) {
-           btn.onclick = () => speakText(\`${fullText.replace(/`/g, '\\`').replace(/\n/g, ' ')}\`, btn);
+           btn.onclick = () => {
+             const cardBody = btn.closest('.scheme-card').querySelector('.scheme-body');
+             speakText(\`${fullText.replace(/`/g, '\\`').replace(/\n/g, ' ')}\`, btn);
+           };
         }
       })();
     </script>
