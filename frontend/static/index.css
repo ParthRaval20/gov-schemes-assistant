@@ -1126,17 +1126,36 @@ header::after {
   padding: 0 1px;
 }
 
-.tts-word.active {
-  background: rgba(255, 153, 51, 0.45) !important;
-  box-shadow: 0 0 8px rgba(255, 153, 51, 0.2);
-  color: var(--navy);
-  font-weight: 600;
-  transform: scale(1.05);
+/* ── Pulse Glow for Reading State ── */
+.reading-active {
+  position: relative;
+  z-index: 5;
+  border-color: var(--saffron) !important;
+  animation: pulse-glow 2s infinite ease-in-out;
+  transition: all 0.4s ease;
 }
 
 .bubble.ai.reading-active {
-  border: 2px solid var(--saffron) !important;
-  box-shadow: 0 0 15px rgba(255, 153, 51, 0.2);
+  background: linear-gradient(135deg, white, #fff9f0) !important;
+  box-shadow: 0 0 25px rgba(255, 153, 51, 0.35) !important;
+}
+
+.scheme-card.reading-active {
+  background: white !important;
+  box-shadow: 0 0 35px rgba(255, 153, 51, 0.45) !important;
+  transform: scale(1.01);
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 15px rgba(255, 153, 51, 0.2); border-color: rgba(255, 153, 51, 0.3); }
+  50% { box-shadow: 0 0 30px rgba(255, 153, 51, 0.5); border-color: rgba(255, 153, 51, 0.8); }
+  100% { box-shadow: 0 0 15px rgba(255, 153, 51, 0.2); border-color: rgba(255, 153, 51, 0.3); }
+}
+
+.tts-word.active {
+  /* No longer adding yellow background per user request */
+  color: var(--navy);
+  font-weight: 600;
 }
 
 /* ══════════════════════════════════════════════════════════════════

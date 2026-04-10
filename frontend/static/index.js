@@ -118,8 +118,8 @@ async function speakText(text, btn, lang) {
   }
 
   // Clear highlights from ANY message
-  document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
   document.querySelectorAll('.bubble.reading-active').forEach(b => b.classList.remove('reading-active'));
+  document.querySelectorAll('.scheme-card.reading-active').forEach(c => c.classList.remove('reading-active'));
 
   // Reset all other speaker buttons
   document.querySelectorAll('.speak-btn').forEach(s => {
@@ -141,14 +141,17 @@ async function speakText(text, btn, lang) {
   const audio = new Audio(url);
   currentAudio = audio;
 
+  // Ensure any existing reading state is cleared
+  document.querySelectorAll('.reading-active').forEach(el => el.classList.remove('reading-active'));
+
   // Find the bubble or card associated with this button
   let container = null;
   if (btn) {
-    container = btn.closest('.bubble') || btn.closest('.scheme-card')?.querySelector('.scheme-body');
+    // If it's a bubble, use it. If it's a card, use the WHOLE card
+    container = btn.closest('.bubble') || btn.closest('.scheme-card');
   }
 
   if (container) {
-    wrapWordsInBubble(container);
     container.classList.add('reading-active');
   }
 
@@ -156,85 +159,22 @@ async function speakText(text, btn, lang) {
     btn.textContent = '⌛...';
     btn.dataset.speaking = '1';
     
-    audio.onplay = () => { 
-      btn.textContent = '⏹ Stop'; 
-    };
+    audio.onplay = () => { btn.textContent = '⏹ Stop'; };
 
     const cleanup = () => {
       if (btn) {
         btn.textContent = '🔊 Listen';
         btn.dataset.speaking = '0';
       }
-      if (container) {
-        container.classList.remove('reading-active');
-        // keep spans for next time or unwrap? Unwrap is cleaner
-        // unwrapWordsInBubble(container); 
-      }
+      if (container) container.classList.remove('reading-active');
       document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
       currentAudio = null;
     };
 
     audio.onended = cleanup;
     audio.onerror = cleanup;
+    audio.onpause = cleanup;
   }
-
-  // Character-weighted Timing Logic 
-  const words = container.querySelectorAll('.tts-word');
-  let totalUnits = 0;
-  const wordRanges = [];
-  
-  // Weights based on phonetic density and natural pauses
-  const isIndianLang = /[\u0900-\u097F\u0A80-\u0AFF]/.test(text); // Devnagari or Gujarati
-  const baseWeight = isIndianLang ? 1.15 : 1.0; 
-
-  words.forEach((w) => {
-    const wordText = w.textContent.trim();
-    let units = wordText.length * baseWeight;
-    units += 1.5; // Account for the space following the word
-    
-    // Add weights for natural pauses in TTS
-    if (/[.\u0964?!]/.test(wordText)) units += 18; // heavy pause at sentence end
-    else if (/[,\u0a83:;]/.test(wordText)) units += 10; // medium pause
-    
-    wordRanges.push({ start: totalUnits, end: totalUnits + units });
-    totalUnits += units;
-  });
-
-  audio.ontimeupdate = () => {
-    if (!container || !audio.duration) return;
-
-    // Latency Compensation: 
-    // Edge-TTS often has ~200ms of silence at start, and browser playback adds ~150ms lag
-    const syncOffset = 0.32; 
-    let adjustedTime = audio.currentTime - syncOffset;
-    if (adjustedTime < 0) adjustedTime = 0;
-
-    const currentUnitPos = (adjustedTime / (audio.duration - syncOffset)) * totalUnits;
-    
-    // Efficiently update classes
-    for (let i = 0; i < words.length; i++) {
-       const range = wordRanges[i];
-       const active = currentUnitPos >= range.start && currentUnitPos < range.end;
-       if (active !== words[i].classList.contains('active')) {
-         words[i].classList.toggle('active', active);
-       }
-    }
-  };
-
-  // Ensure 'Stop' button and Pause events clear everything
-  const fullStop = () => {
-    if (btn) {
-      btn.textContent = '🔊 Listen';
-      btn.dataset.speaking = '0';
-    }
-    if (container) container.classList.remove('reading-active');
-    document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
-    currentAudio = null;
-  };
-
-  audio.onpause = fullStop; // Critical: If audio stops/pauses, clear highlights
-  audio.onended = fullStop;
-  audio.onerror = fullStop;
 
   try {
     await audio.play();
