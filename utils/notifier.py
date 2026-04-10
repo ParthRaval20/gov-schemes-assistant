@@ -27,12 +27,15 @@ def send_email(to_email, subject, body_html, body_text=None):
     """Sends a single HTML email using SMTP."""
     smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
-    smtp_user = os.getenv("SMTP_USERNAME")
-    smtp_pass = os.getenv("SMTP_PASSWORD")
+    smtp_user = os.getenv("SMTP_USERNAME") or os.getenv("EMAIL_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_PASS")
     smtp_sender = os.getenv("SMTP_SENDER", "Yojana AI <notifications@yojana.ai>")
 
-    if not all([smtp_user, smtp_pass]):
-        log.warning("⚠️  SMTP credentials not fullyconfigured in .env. Skipping email.")
+    if not smtp_user or not smtp_pass:
+        missing = []
+        if not smtp_user: missing.append("SMTP_USERNAME/EMAIL_USER")
+        if not smtp_pass: missing.append("SMTP_PASSWORD/EMAIL_PASS")
+        log.warning(f"⚠️  SMTP credentials not fully configured. Missing: {', '.join(missing)}. Skipping email.")
         return False
 
     try:
