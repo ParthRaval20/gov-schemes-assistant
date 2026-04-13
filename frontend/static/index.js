@@ -673,14 +673,14 @@ function renderResult(result) {
   }
   else if (result.type === 'names_only') {
     content = `<div class="bubble ai">
-      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">📋 Government Schemes Found</strong>
+      <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">📋 Government Schemes Found</strong>
       <div style="margin-top:10px;line-height:2">${escapeHtml(result.reply)}</div>
     </div>`;
   }
   else if (result.type === 'specific_field') {
     const field = (result.field || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     content = `<div class="bubble ai">
-      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">📌 ${field}</strong>
+      <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">📌 ${field}</strong>
       <div style="margin-top:10px">${escapeHtml(result.reply)}</div>
     </div>`;
   }
@@ -716,10 +716,10 @@ function renderResult(result) {
     }).filter(([,v]) => v).map(([k,v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
 
     const schemeCards = schemes.map((s, i) => `
-      <div style="background:#f9f9f9;border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;">
+      <div style="background:var(--ai-bubble);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
           <span style="background:var(--green);color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</span>
-          <strong style="color:var(--navy);font-size:14px">${escapeHtml(s.scheme_name || '')}</strong>
+          <strong style="color:var(--saffron);font-size:14px">${escapeHtml(s.scheme_name || '')}</strong>
         </div>
         ${s.why_eligible ? `<div style="color:#138808;font-size:12px;margin-top:4px">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
         ${s.category ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📂 ${escapeHtml(s.category)}</div>` : ''}
@@ -729,7 +729,7 @@ function renderResult(result) {
       </div>`).join('');
 
     content = `<div class="bubble ai">
-      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligible Schemes Found (${schemes.length})</strong>
+      <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligible Schemes Found (${schemes.length})</strong>
       ${profileLines ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.8">${profileLines}</div>` : ''}
       ${schemeCards}
       ${schemes.length > 0 ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">💡 Ask for full details of any scheme above.</div>` : ''}
@@ -752,7 +752,7 @@ function renderResult(result) {
       return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
         <span style="font-size:15px;flex-shrink:0">${icon}</span>
         <div>
-          <div style="font-weight:600;font-size:13px;color:var(--navy)">${escapeHtml(s.scheme_name || '')}</div>
+          <div style="font-weight:600;font-size:13px;color:var(--saffron)">${escapeHtml(s.scheme_name || '')}</div>
           <div style="font-size:12px;color:${color};margin-top:2px">${escapeHtml(s.reason || '')}</div>
           ${s.is_eligible && s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
             ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;margin-top:4px;display:inline-block">🔗 Apply here ↗</a>` : ''}
@@ -761,7 +761,7 @@ function renderResult(result) {
     }).join('');
 
     content = `<div class="bubble ai">
-      <strong style="color:var(--navy);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligibility Check Results</strong>
+      <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligibility Check Results</strong>
       ${profileLines ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.8">${profileLines}</div>` : ''}
       <div style="margin-top:10px">${schemeRows}</div>
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">

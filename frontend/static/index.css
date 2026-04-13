@@ -30,15 +30,16 @@ body.dark-mode {
   --deep-saffron: #ff8800;
   --green: #2ccf1f;
   --navy: #1a1a40;
-  --cream: #121220;
-  --card-bg: #1e1e2f;
-  --chat-bg: #0a0a16;
-  --border: #2a2a3a;
-  --text: #e0e0e0;
+  --accent: #66b2ff; /* New variable for dark mode visibility */
+  --cream: #1a1a2e;
+  --card-bg: #161625;
+  --chat-bg: #050510;
+  --border: #2a2a45;
+  --text: #f0f0f5;
   --muted: #a0a0b0;
-  --ai-bubble: rgba(255, 255, 255, 0.05); /* Glass feel */
-  --user-bubble: #3f3f9f;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --ai-bubble: rgba(255, 255, 255, 0.08);
+  --user-bubble: #333399;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 
 body {
@@ -80,7 +81,7 @@ body {
   color: white;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
   z-index: 100;
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -89,6 +90,11 @@ body {
   left: 0;
   bottom: 0;
   transform: translateX(0);
+}
+
+body.dark-mode .sidebar {
+  background: #0d0d1a;
+  border-right: 1px solid var(--border);
 }
 
 .sidebar.hidden {
@@ -606,7 +612,7 @@ header::after {
   border-radius: 20px;
   padding: 6px 14px;
   font-size: 12px;
-  color: var(--navy);
+  color: var(--text);
   cursor: pointer;
   transition: all 0.2s;
   font-family: 'Noto Sans', sans-serif;
@@ -662,7 +668,7 @@ header::after {
 .welcome-card h2 {
   font-family: 'Rajdhani', sans-serif;
   font-size: 22px;
-  color: var(--navy);
+  color: var(--saffron);
   margin-bottom: 8px;
 }
 
@@ -670,6 +676,11 @@ header::after {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.6;
+}
+
+body.dark-mode .welcome-card p {
+  color: var(--text);
+  opacity: 0.8;
 }
 
 /* Message row */
@@ -1181,12 +1192,12 @@ header::after {
 }
 
 .bubble.ai.reading-active {
-  background: linear-gradient(135deg, white, #fff9f0) !important;
+  background: var(--card-bg) !important;
   box-shadow: 0 0 25px rgba(255, 153, 51, 0.35) !important;
 }
 
 .scheme-card.reading-active {
-  background: white !important;
+  background: var(--card-bg) !important;
   box-shadow: 0 0 35px rgba(255, 153, 51, 0.45) !important;
   transform: scale(1.01);
 }
@@ -1216,8 +1227,8 @@ header::after {
 .list-item {
   position: relative;
   padding: 8px 12px;
-  background: #fdfaf5;
-  border: 1px solid #f0e0d0;
+  background: var(--ai-bubble);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.5;
@@ -1319,7 +1330,7 @@ header::after {
   font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
   font-size: 16px;
-  color: var(--navy);
+  color: var(--saffron);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1366,7 +1377,7 @@ header::after {
 .notif-title {
   font-weight: 700;
   font-size: 13px;
-  color: var(--navy);
+  color: var(--text);
   margin-bottom: 2px;
 }
 
@@ -1426,7 +1437,7 @@ header::after {
 .dropdown-item {
   padding: 10px 14px;
   font-size: 14px;
-  color: var(--navy);
+  color: var(--text);
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   cursor: pointer;
