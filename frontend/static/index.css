@@ -475,10 +475,11 @@ header::after {
 
 .modal-tabs {
   display: flex;
-  background: #eee;
+  background: var(--chat-bg);
   padding: 4px;
   border-radius: 12px;
   margin-bottom: 24px;
+  border: 1px solid var(--border);
 }
 
 .tab-btn {
@@ -491,11 +492,14 @@ header::after {
   font-family: 'Rajdhani', sans-serif;
   font-weight: 600;
   transition: all 0.2s;
+  color: var(--text);
+  opacity: 0.6;
 }
 
 .tab-btn.active {
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: var(--card-bg);
+  box-shadow: var(--shadow);
+  opacity: 1;
 }
 
 .auth-form-container {
@@ -538,10 +542,13 @@ header::after {
   transition: all 0.2s;
   /* Prevent zoom on iOS */
   font-size: 16px;
+  background: var(--cream);
+  color: var(--text);
 }
 
 .form-group input:focus {
-  border-color: var(--navy);
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.15);
 }
 
 .divider {
@@ -966,13 +973,15 @@ body.dark-mode .welcome-card p {
   outline: none;
   line-height: 1.5;
   max-height: 120px;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
   background: var(--cream);
+  color: var(--text);
   min-width: 0;
 }
 
 #question-input:focus {
-  border-color: var(--navy);
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.2);
 }
 
 #question-input::placeholder {
@@ -1107,10 +1116,11 @@ body.dark-mode .welcome-card p {
   flex-shrink: 0;
   transition: all 0.2s;
   font-size: 18px;
+  color: var(--text);
 }
 
 .mic-btn:hover {
-  background: #ffe8cc;
+  background: var(--ai-bubble);
   border-color: var(--saffron);
 }
 
