@@ -1,5 +1,6 @@
 import os
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_mistralai import ChatMistralAI
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -112,10 +113,13 @@ def get_preprocessor_llm():
 def get_embedding_model():
     global _embedding_model
     if _embedding_model is None:
-        print("  Loading Mistral embedding model (API)...")
-        # Use Mistral API for embeddings to save bundle size on Vercel
-        _embedding_model = MistralAIEmbeddings(model="mistral-embed")
-        print("  Mistral embeddings ready.")
+        print("  Loading Hugging Face Inference embedding model (API)...")
+        # Use BGE-Large-EN (API) for Live Vercel compatibility
+        # Ensure 'Inference API' is enabled on your HF token
+        _embedding_model = HuggingFaceEndpointEmbeddings(
+            model="BAAI/bge-large-en-v1.5"
+        )
+        print("  Hugging Face Inference embeddings ready.")
     return _embedding_model
 
 class NativeSupabaseVectorStore:

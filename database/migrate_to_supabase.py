@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from database.db import DATABASE_URL
 from database.models import Base, Scheme
 from sqlalchemy.orm import sessionmaker
-from langchain_mistralai import MistralAIEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from supabase.client import create_client
 import time
 
@@ -115,7 +115,7 @@ def migrate():
         print(f"  Relational database sync complete ({len(df)} schemes).")
 
         # 3. Vector Store Initialization
-        print("\n  Generating AI Vector Index (using Mistral API)...")
+        print("\n  Generating AI Vector Index (using Free Cloud HF Inference API)...")
         if not SUPABASE_URL or not SUPABASE_KEY:
             print("   Skipping vector sync: SUPABASE_URL or SUPABASE_KEY missing.")
             return
@@ -123,7 +123,9 @@ def migrate():
         from langchain_community.vectorstores import SupabaseVectorStore
         
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        embeddings = MistralAIEmbeddings(model="mistral-embed")
+        embeddings = HuggingFaceEndpointEmbeddings(
+            model="BAAI/bge-large-en-v1.5"
+        )
 
         # Prepare documents
         docs = []
