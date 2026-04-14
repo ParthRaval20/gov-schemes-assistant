@@ -160,11 +160,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif text == "   HI":
         context.user_data['lang'] = 'hi'
-        await update.message.reply_text("भाषा हिंदी में सेट की गई है। अपना प्रश्न पूछें या नीचे एक श्रेणी चुनें।")
+        await update.message.reply_text("\u092d\u093e\u0937\u093e \u0939\u093f\u0902\u0926\u0940 \u092e\u0947\u0902 \u0938\u0947\u091f \u0915\u0940 \u0917\u0908 \u0939\u0948\u0964 \u0905\u092a\u0928\u093e \u092a\u094d\u0930\u0936\u094d\u0928 \u092a\u0942\u091b\u0947\u0902 \u092f\u093e \u0928\u0940\u091a\u0947 \u090f\u0915 \u0936\u094d\u0930\u0947\u0923\u0940 \u091a\u0941\u0928\u0947\u0902\u0964")
         return
     elif text == "   GU":
         context.user_data['lang'] = 'gu'
-        await update.message.reply_text("ભાષા ગુજરાતીમાં સેટ કરવામાં આવી છે. તમારો પ્રશ્ન પૂછો અથવા નીચે એક શ્રેણી પસંદ કરો.")
+        await update.message.reply_text("\u0aad\u0abe\u0ab7\u0abe \u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0\u0aae\u0abe\u0a82 \u0ab8\u0ac7\u0a9f \u0a95\u0ab0\u0ab5\u0abe\u0aae\u0abe\u0a82 \u0a86\u0ab5\u0ac0 \u0a9b\u0ac7. \u0aa4\u0aae\u0abe\u0ab0\u0acb \u0aaa\u0acd\u0ab0\u0ab6\u0acd\u0aa8 \u0aaa\u0ac2\u0a9b\u0acb \u0a85\u0aa5\u0ab5\u0abe \u0aa8\u0ac0\u0a9a\u0ac7 \u0a8f\u0a95 \u0ab6\u0acd\u0ab0\u0ac7\u0aa3\u0ac0 \u0aaa\u0ab8\u0a82\u0aa6 \u0a95\u0ab0\u0acb.")
         return
 
     await process_text_and_reply(update, text, chat_id, context)
