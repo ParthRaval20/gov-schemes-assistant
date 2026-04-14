@@ -16,16 +16,16 @@ LANG_STRINGS = {
         "ask_schemes_first": "Please first ask for some schemes, then I can check your eligibility for them.",
     },
     "hi": {
-        "profile_request": """निश्चित रूप से! कृपया अपनी पात्रता जांचने के लिए विवरण साझा करें:\n\n  \u2022 आयु (Age)\n  \u2022 वार्षिक आय (जैसे 1.5 लाख, 50,000)\n  \u2022 व्यवसाय (जैसे छात्र, किसान, स्व-नियोजित)\n  \u2022 राज्य (जैसे गुजरात)\n  \u2022 लिंग (पुरुष / महिला)\n  \u2022 जाति/श्रेणी (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nउदाहरण:\n  आयु: 22, आय: 1.5 लाख, व्यवसाय: छात्र, राज्य: गुजरात, जाति: OBC, लिंग: पुरुष""",
-        "no_schemes_found": "कोई मिलान वाली योजना नहीं मिली। आयु, आय, व्यवसाय, राज्य और जाति जैसी अधिक जानकारी देने का प्रयास करें।",
-        "no_additional_schemes": "आपकी प्रोफाइल के लिए कोई अतिरिक्त मिलान वाली योजना नहीं मिली।",
-        "ask_schemes_first": "कृपया पहले कुछ योजनाओं के बारे में पूछें, फिर मैं उनके लिए आपकी पात्रता की जांच कर सकता हूँ।",
+        "profile_request": """\u0928\u093f\u0936\u094d\u091a\u093f\u0924 \u0930\u0942\u092a \u0938\u0947! \u0915\u094prop\u0943\u092f\u093e \u0905\u092a\u0928\u0940 \u092a\u093e\u0924\u094d\u0930\u0924\u093e \u091c\u093e\u0902\u091a\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0935\u093f\u0935\u0930\u0923 \u0938\u093e\u091d\u093e \u0915\u0930\u0947\u0902:\n\n  \u2022 \u0906\u092f\u0941 (Age)\n  \u2022 \u0935\u093e\u0930\u094d\u0937\u093f\u0915 \u0906\u092f (जैसे 1.5 \u0932\u093e\u0916, 50,000)\n  \u2022 \u0935\u094d\u092f\u0935\u0938\u093e\u092f (जैसे \u091b\u093e\u0924\u094d\u0930, \u0915\u093f\u0938\u093e\u0928, \u0938\u094d\u0935-\u0928\u093f\u092f\u094b\u091c\u093f\u0924)\n  \u2022 \u0930\u093e\u091c\u094d\u092f (जैसे \u0917\u0941\u091c\u0930\u093e\u0924)\n  \u2022 \u0932\u093f\u0902\u0917 (\u092a\u0941\u0930\u0941\u0937 / \u092e\u0939\u093f\u0932\u093e)\n  \u2022 \u091c\u093e\u0924\u093e/\u0936\u094d\u0930\u0947\u0923\u0940 (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\n\u0909\u092a\u0939\u093e\u0930:\n  \u0906\u092f\u0941: 22, \u0906\u092f: 1.5 \u0932\u093e\u0916, \u0935\u094d\u092f\u0935\u0938\u093e\u092f: \u091b\u093e\u0924\u094d\u0930, \u0930\u093e\u091c\u094d\u092f: \u0917\u0941\u091c\u0930\u093e\u0924, \u091c\u093e\u0924\u093f: OBC, \u0932\u093f\u0902\u0917: \u092a\u0941\u0930\u0941\u0937""",
+        "no_schemes_found": "\u0915\u094b\u0902\u0908 \u092e\u093f\u0932\u093e\u0928 \u0935\u093e\u0932\u0940 \u092f\u094b\u091c\u0928\u093e \u0922\u094d\u0922\u0942\u0902\u0922\u0928\u0947 \u092e\u0947\u0902 \u0935\u093f\u092b\u0932\u0964 \u0906\u092f\u0941, \u0906\u092f, \u0935\u094d\u092f\u0935\u0938\u093e\u092f, \u0930\u093e\u091c\u094d\u092f \u0914\u0930 \u091c\u093e\u0924\u093f \u091c\u0948\u0938\u0940 \u0905\u0927\u093f\u0915 \u091c\u093e\u0928\u0915\u093e\u0930\u0940 \u092a\u094d\u0930\u0926\u093e\u0928 \u0915\u0930\u0928\u0947 \u0915\u093e \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964",
+        "no_additional_schemes": "\u0906\u092a\u0915\u0940 \u092a\u094d\u0930\u094b\u092b\u093e\u0907\u0932 \u0915\u0947 \u0932\u093f\u090f \u0915\u094b\u0902\u0908 \u0905\u0924\u093f\u0930\u093f\u0915\u094d\u0924 \u092e\u093f\u0932\u093e\u0928 \u0935\u093e\u0932\u0940 \u092f\u094b\u091c\u0928\u093e \u0928\u0939\u0940\u0902 \u092e\u093f\u0932\u0940\u0964",
+        "ask_schemes_first": "\u0915\u094prop\u0943\u092f\u093e \u092a\u0939\u0932\u0947 \u0915\u0941\u091b \u092f\u094b\u091c\u0928\u093e\u0913\u0902 \u0915\u0947 \u092c\u093e\u0930\u0947 \u092e\u0947\u0902 \u092a\u0942\u091b\u0947\u0902, \u092b\u093f\u0930 \u092e\u0948\u0902 \u0909\u0928\u0915\u0947 \u0932\u093f\u090f \u0906\u092a\u0915\u0940 \u092a\u093e\u0924\u094d\u0930\u0924\u093e \u0915\u0940 \u091c\u093e\u0902\u091a \u0915\u0930 \u0938\u0915\u0924\u093e \u0939\u0942\u0901\u0964",
     },
     "gu": {
-        "profile_request": """ચોક્કસ! કૃપા કરીને તમારી પાત્રતા તપાસવા માટે વિગતો શેર કરો:\n\n  \u2022 ઉંમર (Age)\n  \u2022 વાર્ષિક આવક (દા.ત. 1.5 લાખ, 50,000)\n  \u2022 વ્યવસાય (દા.ત. વિદ્યાર્થી, ખેડૂત, સ્વ-રોજગાર)\n  \u2022 રાજ્ય (દા.ત. ગુજરાત)\n  \u2022 લિંગ (પુરુષ / મહિલા)\n  \u2022 જ્ઞાતિ/શ્રેણી (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nઉદાહરણ:\n  ઉંમર: 22, આવક: 1.5 લાખ, વ્યવસાય: વિદ્યાર્થી, રાજ્ય: ગુજરાત, જ્ઞાતિ: OBC, લિંગ: પુરુષ""",
-        "no_schemes_found": "કોઈ મેળ ખાતી યોજનાઓ મળી નથી. ઉંમર, આવક, વ્યવસાય, રાજ્ય અને જ્ઞાતિ જેવી વધુ વિગતો આપવાનો પ્રયત્ન કરો.",
-        "no_additional_schemes": "તમારી પ્રોફાઇલ માટે કોઈ વધારાની યોજના મળી નથી.",
-        "ask_schemes_first": "કૃપા કરીને પહેલા કેટલીક યોજનાઓ વિશે પૂછો, પછી હું તે માટે તમારી પાત્રતા ચકાસી શકું છું.",
+        "profile_request": """\u0a9a\u0acb\u0a95\u0acd\u0a95\u0ab8! \u0a95\u0ac3\u0aaa\u0abe \u0a95\u0ab0\u0ac0\u0aa8\u0ac7 \u0aa4\u0aae\u0abe\u0ab0\u0ac0 \u0aaa\uref{u0abe\u0aa4\u0acd\u0ab0\u0aa4\u0abe} \u0aa4\u0aaa\u0abe\u0ab8\u0ab5\u0abe \u0aae\u0abe\u0a9f\u0ac7 \u0ab5\u0abf\u0a97\u0aa4\u0acb \u0ab8\u0ac7\u0ab0 \u0a95\u0ab0\u0acb:\n\n  \u2022 \u0a89\u0a82\u0aae\u0ab0 (Age)\n  \u2022 \u0ab5\u0abe\u0ab0\u0acd\u0ab7\u0abf\u0a95 \u0a86\u0ab5\u0a95 (\u0aa6\u0abe.\u0aa4. 1.5 \u0ab2\u0abe\u0a96, 50,000)\n  \u2022 \u0ab5\u0acd\u0aaf\u0ab5\u0ab8\u0abe\u0aaf (\u0aa6\u0abe.\u0aa4. \u0ab5\u0abf\u0aa6\u0acd\u0aaf\u0abe\u0ab0\u0acd\u0aa5\u0ac0, \u0a96\u0ac7\u0aa1\u0ac2\u0aa4, \u0ab8\u0acd\u0ab5-\u0ab0\u0acb\u0a9c\u0a97\u0abe\u0ab0)\n  \u2022 \u0ab0\u0abe\u0a9c\u0acd\u0aaf (\u0aa6\u0abe.\u0aa4. \u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4)\n  \u2022 \u0ab2\u0ab2\u0abf\u0a82\u0a97 (\u0aaa\u0ac1\u0ab0\u0ac1\u0ab7 / \u0aae\u0ab9\u0abf\u0a32\u0abe)\n  \u2022 \u0a9c\u0acd\u0a9e\u0abe\u0aa4\u0abf/\u0ab6\u0acd\u0ab0\u0ac7\u0aa3\u0ac0 (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\n\u0a89\u0aa6\u0abe\u0ab9\u0ab0\u0aa3:\n  \u0a89\u0a82\u0aae\u0ab0: 22, \u0a86\u0ab5\u0a95: 1.5 \u0ab2\u0abe\u0a96, \u0ab5\u0acd\u0aaf\u0ab5\u0ab8\u0abe\u0aaf: \u0ab5\u0abf\u0aa6\u0acd\u0aaf\u0abe\u0ab0\u0acd\u0aa5\u0ac0, \u0ab0\u0abe\u0a9c\u0acd\u0aaf: \u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4, \u0a9c\u0acd\u0a9e\u0abe\u0aa4\u0abf: OBC, \u0ab2\u0abf\u0a82\u0a97: \u0aaa\u0ac1\u0ab0\u0ac1\u0ab7""",
+        "no_schemes_found": "\u0a95\u0acb\u0a08 \u0aae\u0ac7\u0ab3 \u0a96\u0abe\u0aa4\u0ac0 \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93 \u0aae\u0ab3\u0ac0 \u0aa8\u0aa5\u0ac0\u0aed \u0a89\u0a82\u0aae\u0ab0, \u0a86\u0ab5\u0a95, \u0ab5\u0acd\u0aaf\u0ab5\u0ab8\u0abe\u0aaf, \u0ab0\u0abe\u0a9c\u0acd\u0aaf \u0a85\u0aa8\u0ac7 \u0a9c\u0acd\u0a9e\u0abe\u0aa4\u0abf \u0a9c\u0ac7\u0ab5\u0acી \u0ab5\u0abf\u0a97\u0aa4\u0acb \u0a86\u0aaa\u0ab5\u0abe\u0aa8\u0acb \u0aaa\u0acd\u0ab0\u0aaf\u0aa4\u0acd\u0aa8 \u0a95\u0ab0\u0acb\u0aed",
+        "no_additional_schemes": "\u0aa4\u0aae\u0abe\u0ab0\u0ac0 \u0aaa\u0acd\u0ab0\u0acb\u0aab\u0abe\u0a87\u0ab2 \u0aae\u0abe\u0a9f\u0ac7 \u0a95\u0acb\u0a08 \u0ab5\u0aa7\u0abe\u0ab0\u0abe\u0aa8\u0ac0 \u0aaf\u0acb\u0a9c\u0aa8\u0abe \u0aae\u0ab3\u0ac0 \u0aa8\u0aa5\u0ac0\u0aed",
+        "ask_schemes_first": "\u0a95\u0ac3\u0aaa\u0abe \u0a95\u0ab0\u0ac0\u0aa8\u0ac7 \u0aaa\u0ab9\u0ac7\u0ab2\u0abe \u0a95\u0ac7\u0a9f\u0ab2\u0ac0\u0a95 \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93 \u0ab5\u0abf\u0ab8\u0ac7 \u0aaa\u0ac2\u0a9b\u0acb, \u0aaa\u0a9b\u0ac0 \u0ab9\u0ac1\u0a82 \u0aa4\u0ac7 \u0aae\u0abe\u0a9f\u0ac7 \u0aa4\u0aae\u0abe\u0ab0\u0ac0 \u0aaa\u0abe\u0aa4\u0acd\u0ab0\u0aa4\u0abe \u0aa4\u0aaa\u0abe\u0ab8\u0ac0 \u0ab6\u0a95\u0ac1\u0a82 \u0a9b\u0ac1\u0a82\u0aed",
     },
 }
 
@@ -51,23 +51,23 @@ def translate_to_english(text: str, source_lang: str) -> str:
 
     clean = text.strip()
     buttons = {
-        "ખેડૂતો માટે યોજનાઓ 🌾": "Schemes for farmers",
-        "મહિલા કલ્યાણ યોજનાઓ": "Women welfare schemes",
-        "શિક્ષણ શિષ્યવૃત્તિ": "Education scholarships",
-        "આરોગ્ય યોજનાઓ": "Healthcare schemes",
-        "આવાસ યોજના": "housing scheme",
-        "યુવાનો માટે સ્ટાર્ટઅપ યોજનાઓ": "Startup schemes for youth",
-        "ગુજરાતમાં યોજનાઓ": "Schemes in Gujarat",
-        "કૌશલ્ય વિકાસ કાર્યક્રમ": "Skill development programs",
+        "\u0a96\u0ac7\u0aa1\u0ac2\u0aa4\u0acb \u0aae\u0abe\u0a9f\u0ac7 \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93 \ud83c\udf3e": "Schemes for farmers",
+        "\u0aae\u0ab9\u0abf\u0a32\u0abe \u0a95\u0ab2\u0acd\u0aaf\u0abe\u0aa3 \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93": "Women welfare schemes",
+        "\u0ab6\u0ab0\u0acd\u0aa5\u0aa3 \u0ab6\u0abf\u0ab7\u0acd\u0aaf\u0ab5\u0ac3\u0aa4\u0acd\u0aa4\u0abf": "Education scholarships",
+        "\u0a86\u0ab0\u0acb\u0a97\u0acd\u0aaf \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93": "Healthcare schemes",
+        "\u0a86\u0ab5\u0abe\u0ab8 \u0aaf\u0acb\u0a9c\u0aa8\u0abe": "housing scheme",
+        "\u0aaf\u0ac1\u0ab5\u0abe\u0aa8\u0acb \u0aae\u0abe\u0a9f\u0ac7 \u0ab8\u0acd\u0a9f\u0abe\u0ab0\u0acd\u0a9f\u0a85\u0aaa \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93": "Startup schemes for youth",
+        "\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0aae\u0abe\u0a82 \u0aaf\u0acb\u0a9c\u0aa8\u0abe\u0a93": "Schemes in Gujarat",
+        "\u0a95\u0acc\u0ab6\u0ab2\u0acd\u0aaf \u0ab5\u0abf\u0a95\u0abe\u0ab8 \u0a95\u0abe\u0ab0\u0acd\u0aaf\u0a95\u0acd\u0ab0\u0aae": "Skill development programs",
         
-        "किसानों के लिए योजनाएं 🌾": "Schemes for farmers",
-        "महिला कल्याण योजनाएं": "Women welfare schemes",
-        "शिक्षा छात्रवृत्ति": "Education scholarships",
-        "स्वास्थ्य योजनाएं": "Healthcare schemes",
-        "आवास योजना": "housing scheme",
-        "युवाओं के लिए स्टार्टअप योजनाएं": "Startup schemes for youth",
-        "गुजरात में योजनाएं": "Schemes in Gujarat",
-        "कौशल विकास कार्यक्रम": "Skill development programs"
+        "\u0915\u093f\u0938\u093e\u0928\u094b\u0902 \u0915\u0947 \u0932\u093f\u090f \u092f\u094b\u091c\u0928\u093e\u0902\u090f\u0902 \ud83c\udf3e": "Schemes for farmers",
+        "\u092e\u0939\u093f\u0932\u093e \u0915\u0932\u094d\u092f\u093e\u0923 \u092f\u094b\u091c\u0928\u093e\u0902\u090f\u0902": "Women welfare schemes",
+        "\u0936\u093f\u0915\u094d\u0937\u093e \u091b\u093e\u0924\u094d\u0930\u0935\u094d\u0923\u0924\u094d\u0924\u093f": "Education scholarships",
+        "\u0938\u094d\u0935\u093e\u0938\u094d\u0925\u094d\u092f \u092f\u094b\u091c\u0928\u093e\u0902\u090f\u0902": "Healthcare schemes",
+        "\u0906\u0935\u093e\u0938 \u092f\u094b\u091c\u0928\u093e": "housing scheme",
+        "\u092f\u0941\u0935\u093e\u0903\u0913\u0902 \u0915\u0947 \u0932\u093f\u090f \u0938\u094d\u091f\u093e\u0930\u094d\u091f\u0905\u092a \u092f\u094b\u091c\u0928\u093e\u0902\u090f\u0902": "Startup schemes for youth",
+        "\u0917\u0941\u091c\u0930\u093e\u0924 \u092e\u0947\u0902 \u092f\u094b\u091c\u0928\u093e\u0902\u090f\u0902": "Schemes in Gujarat",
+        "\u0915\u094c\u0936\u0932 \u0935\u093f\u0915\u093e\u0938 \u0915\u093e\u0930\u094d\u092f\u0915\u094d\u0930\u092e": "Skill development programs"
     }
     if clean in buttons:
         return buttons[clean]
@@ -80,7 +80,6 @@ def translate_to_english(text: str, source_lang: str) -> str:
         f"Translate this {lang_name} query to English for a government scheme search engine.\n"
         f"Critical for Search Accuracy: For local terms (especially agricultural crops like 'Bajri', 'Kapas', or 'Jowar', products, or occupations like 'Khedut'), "
         f"provide BOTH the common transliterated name and the standard English translation. "
-        f"Example: '     ' -> 'bajri (millet)', '    ' -> 'kapas (cotton)', '     ' -> 'magfali (groundnut)'. "
         f"Keep unchanged: scheme names, acronyms like SC/ST/OBC/EWS/SEBC, state names, numbers, rupee amounts.\n"
         f"Return ONLY the English translation.\n\n"
         f"{lang_name}: {text}\n"
@@ -97,15 +96,15 @@ def translate_response(text: str, target_lang: str) -> str:
     if not text or not text.strip():
         return text
 
-    lang_name = {"hi": "Hindi (      , Devanagari script)", "gu": "Gujarati (       , Gujarati script)"}[target_lang]
+    lang_name = {"hi": "Hindi (\u0939\u093f\u0902\u0926\u0940, Devanagari script)", "gu": "Gujarati (\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0, Gujarati script)"}[target_lang]
     script_warn = {
-        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (      ). Do NOT use Gujarati script.",
-        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (       ). Do NOT use Hindi/Devanagari script.",
+        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (\u0939\u093f\u0902\u0926\u0940). Do NOT use Gujarati script.",
+        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0). Do NOT use Hindi/Devanagari script.",
     }[target_lang]
     r = get_llm().invoke(
         f"Translate this English text to {lang_name}.\n"
         f"{script_warn}\n"
-        f"Keep unchanged: scheme names, official links, SC/ST/OBC/EWS/SEBC, state names,   amounts, numbers.\n"
+        f"Keep unchanged: scheme names, official links, SC/ST/OBC/EWS/SEBC, state names, amounts, numbers.\n"
         f"Return ONLY the translation.\n\nEnglish: {text}\n\nTranslation:"
     )
     translated = r.content.strip()
@@ -119,13 +118,10 @@ def translate_scheme_dict(d: dict, target_lang: str) -> dict:
     if target_lang == "en":
         return d
     lang_name = {"hi": "Hindi", "gu": "Gujarati"}.get(target_lang, "English")
-    
-    # We only care about translating text that users read.
     keys_to_translate = [k for k in ("scheme_name", "description", "benefits", 
                                      "eligibility", "documents_required", 
                                      "application_process", "category") 
                          if k in d and d[k]]
-    
     if not keys_to_translate:
         return d
 
@@ -133,12 +129,12 @@ def translate_scheme_dict(d: dict, target_lang: str) -> dict:
     json_in = json.dumps(to_translate, ensure_ascii=False)
     
     script_warn = {
-        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (      ). Do NOT output Gujarati.",
-        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (       ). Do NOT output Hindi.",
+        "hi": "IMPORTANT: Use ONLY Hindi language with Devanagari script (\u0939\u093f\u0902\u0926\u0940). Do NOT output Gujarati.",
+        "gu": "IMPORTANT: Use ONLY Gujarati language with Gujarati script (\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0). Do NOT output Hindi.",
     }.get(target_lang, "")
     prompt = f"""Translate text values to {lang_name} while keeping numbers, Rs amounts, links, and SC/ST/OBC acronyms exactly the same.
-CRITICAL: Preserve all original line breaks and structural patterns like numbered lists (1. 2. 3.) or bullet points ( ).
-CLEAN UI RULE: Remove redundant link-directing filler phrases such as "click here", "click", "here", "visit link", or native versions like "               ", "    ", "              ", "    " from the output to keep it cleaner.
+CRITICAL: Preserve all original line breaks and structural patterns like numbered lists (1. 2. 3.) or bullet points (\u2022).
+CLEAN UI RULE: Remove redundant link-directing filler phrases such as "click here", "click", "here", "visit link", or native versions from the output.
 {script_warn}
 Return ONLY valid JSON that matches the required schema.
 
