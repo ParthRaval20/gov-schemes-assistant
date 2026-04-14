@@ -1022,14 +1022,16 @@ body.dark-mode .link-value:hover {
 }
 
 .mic-btn.listening {
-  background: #ff4b2b;
+  background: #ff4b2b !important;
+  color: white !important;
   animation: pulse-red 1.5s infinite;
 }
 
 body.dark-mode .mic-btn.listening {
-  background: #ff3b30;
+  background: #ff3b30 !important;
+  color: white !important;
   animation: pulse-red-dark 1.5s infinite;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
 @keyframes pulse-red {
