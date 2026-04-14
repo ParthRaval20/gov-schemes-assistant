@@ -40,6 +40,8 @@ body.dark-mode {
   --ai-bubble: rgba(255, 255, 255, 0.08);
   --user-bubble: #333399;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --link-color: var(--saffron);
+  --link-hover-color: var(--deep-saffron);
 }
 
 body {
@@ -876,9 +878,19 @@ body.dark-mode .welcome-card p {
   word-break: break-all;
 }
 
+body.dark-mode .link-value {
+  color: var(--link-color, var(--saffron));
+  border-bottom-color: var(--link-color, var(--saffron));
+}
+
 .link-value:hover {
   color: var(--deep-saffron);
   border-color: var(--deep-saffron);
+}
+
+body.dark-mode .link-value:hover {
+  color: var(--link-hover-color, var(--deep-saffron));
+  border-bottom-color: var(--link-hover-color, var(--deep-saffron));
 }
 
 .divider {
@@ -1174,9 +1186,18 @@ body.dark-mode .welcome-card p {
   transition: all 0.2s;
 }
 
+body.dark-mode .speak-btn {
+  color: var(--text);
+}
+
 .speak-btn:hover {
   border-color: var(--navy);
   color: var(--navy);
+}
+
+body.dark-mode .speak-btn:hover {
+  border-color: var(--saffron);
+  color: var(--saffron);
 }
 
 .speak-btn.speaking {
@@ -1222,6 +1243,10 @@ body.dark-mode .welcome-card p {
   /* No longer adding yellow background per user request */
   color: var(--navy);
   font-weight: 600;
+}
+
+body.dark-mode .tts-word.active {
+  color: var(--saffron);
 }
 
 /* ══════════════════════════════════════════════════════════════════
