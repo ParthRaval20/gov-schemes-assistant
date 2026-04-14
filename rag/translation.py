@@ -16,16 +16,16 @@ LANG_STRINGS = {
         "ask_schemes_first": "Please first ask for some schemes, then I can check your eligibility for them.",
     },
     "hi": {
-        "profile_request": """     !                                             :\n\n  \u2022     (    )\n  \u2022             (     1.5    , 50,000)\n  \u2022             (          ,      ,    -      )\n  \u2022             (           )\n  \u2022             (      /      )\n  \u2022     /       (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\n      :\n     : 22,   : 1.5    ,     :      ,      :       ,     : OBC,     :      """,
-        "no_schemes_found": "         -                                     ,   ,     ,                              ",
-        "no_additional_schemes": "                                                   ",
-        "ask_schemes_first": "                          ,                                             ",
+        "profile_request": """निश्चित रूप से! कृपया अपनी पात्रता जांचने के लिए विवरण साझा करें:\n\n  \u2022 आयु (Age)\n  \u2022 वार्षिक आय (जैसे 1.5 लाख, 50,000)\n  \u2022 व्यवसाय (जैसे छात्र, किसान, स्व-नियोजित)\n  \u2022 राज्य (जैसे गुजरात)\n  \u2022 लिंग (पुरुष / महिला)\n  \u2022 जाति/श्रेणी (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nउदाहरण:\n  आयु: 22, आय: 1.5 लाख, व्यवसाय: छात्र, राज्य: गुजरात, जाति: OBC, लिंग: पुरुष""",
+        "no_schemes_found": "कोई मिलान वाली योजना नहीं मिली। आयु, आय, व्यवसाय, राज्य और जाति जैसी अधिक जानकारी देने का प्रयास करें।",
+        "no_additional_schemes": "आपकी प्रोफाइल के लिए कोई अतिरिक्त मिलान वाली योजना नहीं मिली।",
+        "ask_schemes_first": "कृपया पहले कुछ योजनाओं के बारे में पूछें, फिर मैं उनके लिए आपकी पात्रता की जांच कर सकता हूँ।",
     },
     "gu": {
-        "profile_request": """      !                                            :\n\n  \u2022     \n  \u2022              (  . . 1.5    , 50,000)\n  \u2022              (  . .           ,      ,    -      )\n  \u2022              (  . .       )\n  \u2022              (      /       )\n  \u2022       /      (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\n      :\n      : 22,    : 1.5    ,        :           ,      :       ,       : OBC,     :      """,
-        "no_schemes_found": "                       .                ,    ,        ,                     .",
-        "no_additional_schemes": "                                              .",
-        "ask_schemes_first": "                                ,                             .",
+        "profile_request": """ચોક્કસ! કૃપા કરીને તમારી પાત્રતા તપાસવા માટે વિગતો શેર કરો:\n\n  \u2022 ઉંમર (Age)\n  \u2022 વાર્ષિક આવક (દા.ત. 1.5 લાખ, 50,000)\n  \u2022 વ્યવસાય (દા.ત. વિદ્યાર્થી, ખેડૂત, સ્વ-રોજગાર)\n  \u2022 રાજ્ય (દા.ત. ગુજરાત)\n  \u2022 લિંગ (પુરુષ / મહિલા)\n  \u2022 જ્ઞાતિ/શ્રેણી (SC / ST / OBC / General / EWS / SEBC / NT / DNT / Minority)\n\nઉદાહરણ:\n  ઉંમર: 22, આવક: 1.5 લાખ, વ્યવસાય: વિદ્યાર્થી, રાજ્ય: ગુજરાત, જ્ઞાતિ: OBC, લિંગ: પુરુષ""",
+        "no_schemes_found": "કોઈ મેળ ખાતી યોજનાઓ મળી નથી. ઉંમર, આવક, વ્યવસાય, રાજ્ય અને જ્ઞાતિ જેવી વધુ વિગતો આપવાનો પ્રયત્ન કરો.",
+        "no_additional_schemes": "તમારી પ્રોફાઇલ માટે કોઈ વધારાની યોજના મળી નથી.",
+        "ask_schemes_first": "કૃપા કરીને પહેલા કેટલીક યોજનાઓ વિશે પૂછો, પછી હું તે માટે તમારી પાત્રતા ચકાસી શકું છું.",
     },
 }
 
@@ -51,23 +51,23 @@ def translate_to_english(text: str, source_lang: str) -> str:
 
     clean = text.strip()
     buttons = {
-        "                        ": "Schemes for farmers",
-        "                    ": "Women welfare schemes",
-        "                  ": "Education scholarships",
-        "                 ": "Healthcare schemes",
-        "          ": "housing scheme",
-        "                               ": "Startup schemes for youth",
-        "                  ": "Schemes in Gujarat",
-        "                    ": "Skill development programs",
+        "ખેડૂતો માટે યોજનાઓ 🌾": "Schemes for farmers",
+        "મહિલા કલ્યાણ યોજનાઓ": "Women welfare schemes",
+        "શિક્ષણ શિષ્યવૃત્તિ": "Education scholarships",
+        "આરોગ્ય યોજનાઓ": "Healthcare schemes",
+        "આવાસ યોજના": "housing scheme",
+        "યુવાનો માટે સ્ટાર્ટઅપ યોજનાઓ": "Startup schemes for youth",
+        "ગુજરાતમાં યોજનાઓ": "Schemes in Gujarat",
+        "કૌશલ્ય વિકાસ કાર્યક્રમ": "Skill development programs",
         
-        "                    ": "Schemes for farmers",
-        "                   ": "Women welfare schemes",
-        "                  ": "Education scholarships",
-        "                  ": "Healthcare schemes",
-        "          ": "housing scheme",
-        "                            ": "Startup schemes for youth",
-        "                ": "Schemes in Gujarat",
-        "                      ": "Skill development programs"
+        "किसानों के लिए योजनाएं 🌾": "Schemes for farmers",
+        "महिला कल्याण योजनाएं": "Women welfare schemes",
+        "शिक्षा छात्रवृत्ति": "Education scholarships",
+        "स्वास्थ्य योजनाएं": "Healthcare schemes",
+        "आवास योजना": "housing scheme",
+        "युवाओं के लिए स्टार्टअप योजनाएं": "Startup schemes for youth",
+        "गुजरात में योजनाएं": "Schemes in Gujarat",
+        "कौशल विकास कार्यक्रम": "Skill development programs"
     }
     if clean in buttons:
         return buttons[clean]

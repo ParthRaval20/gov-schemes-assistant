@@ -160,11 +160,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif text == "   HI":
         context.user_data['lang'] = 'hi'
-        await update.message.reply_text("                                                                             ")
+        await update.message.reply_text("भाषा हिंदी में सेट की गई है। अपना प्रश्न पूछें या नीचे एक श्रेणी चुनें।")
         return
     elif text == "   GU":
         context.user_data['lang'] = 'gu'
-        await update.message.reply_text("                            .                                                 .")
+        await update.message.reply_text("ભાષા ગુજરાતીમાં સેટ કરવામાં આવી છે. તમારો પ્રશ્ન પૂછો અથવા નીચે એક શ્રેણી પસંદ કરો.")
         return
 
     await process_text_and_reply(update, text, chat_id, context)
