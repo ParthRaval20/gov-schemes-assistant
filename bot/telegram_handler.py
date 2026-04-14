@@ -175,17 +175,37 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     temp_ogg = f"tg_voice_{uuid.uuid4()}.ogg"
     await voice_file.download_to_drive(temp_ogg)
     
+    ui_lang = context.user_data.get('lang', 'en') if context else 'en'
+    print(f"DEBUG: Processing Telegram voice message in {ui_lang}...")
+
     try:
         if not GROQ_API_KEY:
-            await update.message.reply_text("   Voice not configured on this server.")
+            await update.message.reply_text("🎙️ Voice not configured on this server.")
             return
+
         groq_client = Groq(api_key=GROQ_API_KEY)
+        
+        # Multilingual prompt to help Whisper with domain and language context
+        prompt_text = (
+            "This is Yojana AI, helpful assistant for Gujarat government schemes. "
+            "Keywords: Kunwarbai Nu Mameru, Vahali Dikri Yojana, Namo Saraswati, "
+            "Jan Arogya Yojana, Farmers, Education, Scholarship, Gujarat Govt, "
+            "ખેડૂત, વિદ્યાર્થી, કુંવરબાઇનું મામેરું, વહાલી દીકરી યોજના, "
+            "નમો સરસ્વતી વિદ્યા સાધના, આરોગ્ય, સહાય, ગુજરાત સરકાર, "
+            "कुंवरबाई नु मामेरू, वहाली डिक्री योजना, नमो सरस्वती, "
+            "जन आरोग्य योजना, किसान, शिक्षा, छात्रवृत्ति, गुजरात सरकार।"
+        )
+
         with open(temp_ogg, "rb") as file:
             transcription = groq_client.audio.transcriptions.create(
                 file=(temp_ogg, file.read()),
                 model="whisper-large-v3",
+                language=ui_lang,
+                prompt=prompt_text,
                 response_format="json"
             )
+        
+        print(f"DEBUG: Transcription successful: {transcription.text}")
         await process_text_and_reply(update, transcription.text, chat_id, context, is_voice=True)
     finally:
         if os.path.exists(temp_ogg): os.remove(temp_ogg)
