@@ -102,7 +102,10 @@
   <div class="input-area">
     <div id="autocomplete-box" class="autocomplete-box hidden"></div>
     <div class="input-row">
-      <textarea id="question-input" rows="1" placeholder="Ask about any government scheme…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <div class="input-wrapper">
+        <div id="suggestion-box" class="suggestion-box hidden"></div>
+        <textarea id="question-input" rows="1" placeholder="Ask about any government scheme…" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      </div>
       <button class="mic-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input (click to speak)">🎙️</button>
       <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
     </div>
