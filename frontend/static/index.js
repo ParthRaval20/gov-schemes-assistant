@@ -14,11 +14,6 @@ const VOICE_HINT = {
   gu: { idle: 'Enter દબાવો મોકલવા માટે · Shift+Enter નવી લીટી માટે', listening: '🔴 સાંભળી રહ્યો છું… રોકવા માટે ફરીથી ક્લિક કરો' },
 };
 
-let allSuggestions = [];
-let activeSuggestionIndex = -1;
-let filteredSuggestions = [];
-
-
 function toggleVoice() {
   if (isListening) {
     if (recognition) recognition.stop();
@@ -453,7 +448,6 @@ window.onload = async () => {
   initTheme();
   setLang('en');
   updateUserUI();
-  fetchSuggestions(); // Load autocomplete data
   const res = await fetch('/me');
   const data = await res.json();
   if (data.user) {
@@ -462,7 +456,6 @@ window.onload = async () => {
     loadHistory();
   }
 };
-
 
 async function loadHistory() {
   if (!currentUser) return;
@@ -595,181 +588,16 @@ async function saveChat(userMsg, aiResult) {
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-  if (typeof handleAutocomplete === 'function') handleAutocomplete();
 }
-
 
 function handleKey(e) {
-  const box = document.getElementById('autocomplete-box');
-  if (!box.classList.contains('hidden')) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, filteredSuggestions.length - 1);
-      renderAutocomplete(filteredSuggestions);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, 0);
-      renderAutocomplete(filteredSuggestions);
-    } else if (e.key === 'Enter') {
-      if (activeSuggestionIndex >= 0) {
-        e.preventDefault();
-        selectSuggestion(filteredSuggestions[activeSuggestionIndex].name);
-        return;
-      }
-    } else if (e.key === 'Escape') {
-      box.classList.add('hidden');
-      input.classList.remove('has-autocomplete');
-      return;
-    }
-  }
-
-  if (e.key === 'Enter' && !e.shiftKey) { 
-    e.preventDefault(); 
-    document.getElementById('autocomplete-box').classList.add('hidden');
-    input.classList.remove('has-autocomplete');
-    sendMessage(); 
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 }
 
-
-async function fetchSuggestions(lang = 'en') {
-  try {
-    const res = await fetch(`/get_suggestions?lang=${lang}`);
-    const data = await res.json();
-    allSuggestions = data.suggestions || [];
-  } catch (err) {
-    console.error("Failed to fetch suggestions:", err);
-  }
+function sendChip(el) {
+  input.value = el.textContent.trim();
+  sendMessage();
 }
-
-function renderAutocomplete(filtered, isCategories = false) {
-  const box = document.getElementById('autocomplete-box');
-  if (filtered.length === 0) {
-    box.classList.add('hidden');
-    input.classList.remove('has-autocomplete');
-    return;
-  }
-
-  // Calculate position and width to match textbox
-  const inputRect = input.getBoundingClientRect();
-  const areaRect = document.querySelector('.input-area').getBoundingClientRect();
-  
-  // Align box exactly with the textbox
-  box.style.width = inputRect.width + 'px';
-  box.style.left = (inputRect.left - areaRect.left) + 'px';
-  
-  // Position it right above the input (flush)
-  const bottomOffset = areaRect.bottom - inputRect.top;
-  box.style.bottom = (bottomOffset - 1) + 'px'; // -1 to overlap the border slightly
-
-
-  const headerText = isCategories ? {
-    en: 'Quick Search',
-    hi: 'त्वरित खोज',
-    gu: 'ઝડપી શોધ'
-  } : {
-    en: 'Suggested Schemes',
-    hi: 'सुझाई गई योजनाएं',
-    gu: 'સૂચવેલ યોજનાઓ'
-  };
-
-  let html = `<div class="autocomplete-header">${headerText[currentLang] || headerText.en}</div>`;
-  
-  filtered.forEach((item, index) => {
-    if (isCategories) {
-      // Category item (string)
-      html += `
-        <div class="autocomplete-item category ${index === activeSuggestionIndex ? 'active' : ''}" onclick="selectSuggestion('${item.replace(/'/g, "\\'")}', true)">
-          <div class="category-row">
-            <span class="category-icon">🔍</span>
-            <span class="scheme-name">${escapeHtml(item)}</span>
-          </div>
-        </div>
-      `;
-    } else {
-      // Scheme item (object)
-      html += `
-        <div class="autocomplete-item ${index === activeSuggestionIndex ? 'active' : ''}" onclick="selectSuggestion('${item.name.replace(/'/g, "\\'")}')">
-          <span class="scheme-name">${escapeHtml(item.name)}</span>
-          ${item.category ? `<span class="scheme-category">${escapeHtml(item.category)}</span>` : ''}
-        </div>
-      `;
-    }
-  });
-
-  box.innerHTML = html;
-  box.classList.remove('hidden');
-  input.classList.add('has-autocomplete');
-  
-  // Match border color on focus
-  if (document.activeElement === input) {
-    box.classList.add('active-border');
-  } else {
-    box.classList.remove('active-border');
-  }
-}
-
-
-function selectSuggestion(name, isCategory = false) {
-  input.value = name;
-  document.getElementById('autocomplete-box').classList.add('hidden');
-  input.classList.remove('has-autocomplete');
-  input.focus();
-  autoResize(input);
-  if (isCategory) {
-    handleAutocomplete(); // Trigger new autocomplete for the category
-  }
-}
-
-
-function handleAutocomplete() {
-  const query = input.value.trim().toLowerCase();
-  
-  if (!query) {
-    // Show category suggestions when focused and empty
-    if (document.activeElement === input) {
-      const L = LANG_UI[currentLang] || LANG_UI.en;
-      filteredSuggestions = L.chips || [];
-      activeSuggestionIndex = -1;
-      renderAutocomplete(filteredSuggestions, true);
-    } else {
-      document.getElementById('autocomplete-box').classList.add('hidden');
-      input.classList.remove('has-autocomplete');
-    }
-    return;
-  }
-
-  filteredSuggestions = allSuggestions.filter(s => 
-    s.name.toLowerCase().includes(query) || 
-    (s.en_name && s.en_name.toLowerCase().includes(query)) ||
-    (s.category && s.category.toLowerCase().includes(query))
-  ).slice(0, 8);
-
-  activeSuggestionIndex = -1;
-  renderAutocomplete(filteredSuggestions, false);
-}
-
-
-// Add event listeners for autocomplete
-input.addEventListener('input', handleAutocomplete);
-input.addEventListener('focus', handleAutocomplete);
-input.addEventListener('blur', () => {
-  // Delay hidden so clicks can register
-  setTimeout(() => {
-    document.getElementById('autocomplete-box').classList.add('hidden');
-    input.classList.remove('has-autocomplete');
-  }, 200);
-});
-// Hide when clicking outside
-document.addEventListener('click', (e) => {
-  const box = document.getElementById('autocomplete-box');
-  if (!box.contains(e.target) && e.target !== input) {
-    box.classList.add('hidden');
-    input.classList.remove('has-autocomplete');
-  }
-});
-
-
 
 function scrollBottom() {
   setTimeout(() => chat.scrollTop = chat.scrollHeight, 50);
@@ -1238,7 +1066,6 @@ async function sendMessage() {
     renderResult({ error: 'Network error. Please try again.' });
   } finally {
     sendBtn.disabled = false;
-    input.focus();
   }
 }
 
@@ -1288,8 +1115,6 @@ const LANG_UI = {
 let currentLang = 'en';  // tracks which language button is active
 
 function setLang(lang) {
-  // Fetch suggestions for the new language
-  fetchSuggestions(lang);
   currentLang = lang;
   if (isListening && recognition) recognition.stop();
   // Update active button
@@ -1301,8 +1126,12 @@ function setLang(lang) {
   document.getElementById('question-input').placeholder = L.placeholder;
   // Update hint text
   document.getElementById('input-hint').textContent = L.hint;
+  // Update suggestion chips
+  // Suggestions are now handled by the new suggestion-box
+  if (input === document.activeElement) {
+    showSuggestions();
+  }
 }
-
 
 // ── Web Notifications ────────────────────────────────────────────────────────
 function toggleNotifDropdown() {
@@ -1369,7 +1198,6 @@ window.addEventListener('click', (e) => {
 });
 
 // Update window.onload to also fetch notifications
-const originalOnload = window.onload;
 window.onload = async () => {
     if (originalOnload) await originalOnload();
     if (currentUser) {
@@ -1377,4 +1205,149 @@ window.onload = async () => {
         // Check for new notifications every 5 minutes
         setInterval(loadNotifications, 5 * 60 * 1000);
     }
+};
+
+// ── Suggestion Box Logic ───────────────────────────────────────────────────
+const suggestionBox = document.getElementById('suggestion-box');
+let selectedSuggestionIndex = -1;
+
+const QUICK_START = {
+  en: [
+    { text: "Schemes for farmers 🌾", icon: "🌾", category: "Quick Start" },
+    { text: "Women welfare schemes", icon: "👩‍👧", category: "Quick Start" },
+    { text: "Education scholarships", icon: "🎓", category: "Quick Start" },
+    { text: "Healthcare schemes", icon: "🏥", category: "Quick Start" },
+    { text: "housing scheme", icon: "🏠", category: "Quick Start" },
+    { text: "Startup schemes for youth", icon: "💼", category: "Quick Start" }
+  ],
+  hi: [
+    { text: "किसानों के लिए योजनाएं 🌾", icon: "🌾", category: "त्वरित शुरुआत" },
+    { text: "महिला कल्याण योजनाएं", icon: "👩‍👧", category: "त्वरित शुरुआत" },
+    { text: "शिक्षा छात्रवृत्ति", icon: "🎓", category: "त्वरित शुरुआत" },
+    { text: "स्वास्थ्य योजनाएं", icon: "🏥", category: "त्वरित शुरुआत" },
+    { text: "आवास योजना", icon: "🏠", category: "त्वरित शुरुआत" },
+    { text: "युवाओं के लिए स्टार्टअप योजनाएं", icon: "💼", category: "त्वरित शुरुआत" }
+  ],
+  gu: [
+    { text: "ખેડૂતો માટે યોજનાઓ 🌾", icon: "🌾", category: "ઝડપી શરૂઆત" },
+    { text: "મહિલા કલ્યાણ યોજનાઓ", icon: "👩‍👧", category: "ઝડપી શરૂઆત" },
+    { text: "શિક્ષણ શિષ્યવૃત્તિ", icon: "🎓", category: "ઝડપી શરૂઆત" },
+    { text: "આરોગ્ય સેવા યોજનાઓ", icon: "🏥", category: "ઝડપી શરૂઆત" },
+    { text: "આવાસ યોજના", icon: "🏠", category: "ઝડપી શરૂઆત" },
+    { text: "યુવાનો માટે સ્ટાર્ટઅપ યોજનાઓ", icon: "💼", category: "ઝડપી શરૂઆત" }
+  ]
+};
+
+function showSuggestions() {
+  const q = input.value.trim();
+  if (!q) {
+    renderSuggestions(QUICK_START[currentLang]);
+  } else {
+    debouncedFetchSuggestions(q);
+  }
+}
+
+function hideSuggestions() {
+  setTimeout(() => {
+    suggestionBox.classList.add('hidden');
+    selectedSuggestionIndex = -1;
+  }, 200);
+}
+
+let debounceTimer;
+function debouncedFetchSuggestions(q) {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => fetchSuggestions(q), 300);
+}
+
+async function fetchSuggestions(q) {
+  // Autocomplete ONLY works for English as requested
+  if (currentLang !== 'en') {
+      // If not English, still show Quick Start or clear? 
+      // Requirement says "this only work for english" for scheme names.
+      // So we don't fetch from backend if not 'en'.
+      return;
+  }
+  
+  try {
+    const res = await fetch(`/suggest?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (data.length > 0) {
+      renderSuggestions(data.map(name => ({ text: name, icon: "🔍", category: "Scheme" })));
+    } else {
+      hideSuggestions();
+    }
+  } catch (err) {
+    console.error("Fetch Suggestions Error:", err);
+  }
+}
+
+function renderSuggestions(list) {
+  if (!list || list.length === 0) {
+    suggestionBox.classList.add('hidden');
+    return;
+  }
+  
+  suggestionBox.innerHTML = list.map((item, idx) => `
+    <div class="suggestion-item" onclick="selectSuggestion('${item.text.replace(/'/g, "\\'")}')" data-index="${idx}">
+      <span class="icon">${item.icon || '📌'}</span>
+      <span class="text">${item.text}</span>
+    </div>
+  `).join('');
+  
+  suggestionBox.classList.remove('hidden');
+  selectedSuggestionIndex = -1;
+}
+
+function selectSuggestion(text) {
+  input.value = text;
+  suggestionBox.classList.add('hidden');
+  autoResize(input);
+  input.focus();
+}
+
+function moveSelection(direction) {
+  const items = suggestionBox.querySelectorAll('.suggestion-item');
+  if (items.length === 0) return;
+  
+  items.forEach(i => i.classList.remove('selected'));
+  
+  if (direction === 'down') {
+    selectedSuggestionIndex = (selectedSuggestionIndex + 1) % items.length;
+  } else {
+    selectedSuggestionIndex = (selectedSuggestionIndex - 1 + items.length) % items.length;
+  }
+  
+  const selected = items[selectedSuggestionIndex];
+  selected.classList.add('selected');
+  selected.scrollIntoView({ block: 'nearest' });
+}
+
+// Event Listeners
+input.addEventListener('focus', showSuggestions);
+input.addEventListener('input', showSuggestions);
+input.addEventListener('blur', hideSuggestions);
+
+// Update handleKey to support Arrow navigation
+const originalHandleKey = handleKey;
+window.handleKey = function(e) {
+  if (suggestionBox && !suggestionBox.classList.contains('hidden')) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveSelection('down');
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveSelection('up');
+      return;
+    }
+    if (e.key === 'Enter' && selectedSuggestionIndex > -1) {
+      e.preventDefault();
+      const items = suggestionBox.querySelectorAll('.suggestion-item');
+      items[selectedSuggestionIndex].click();
+      return;
+    }
+  }
+  originalHandleKey(e);
 };
