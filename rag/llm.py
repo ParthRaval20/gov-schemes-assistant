@@ -3,6 +3,9 @@ from langchain_mistralai import ChatMistralAI
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Union, Any
+from langchain_core.documents import Document
+
+
 
 # -------------------------------------------------
 # Schemas
@@ -166,8 +169,8 @@ class NativeSupabaseVectorStore:
             self.k = k
             
         def invoke(self, query):
-            from langchain_core.documents import Document
             embed = self.store.embedding.embed_query(query)
+
             try:
                 res = self.store.client.rpc(self.store.query_name, {
                     "query_embedding": embed,
