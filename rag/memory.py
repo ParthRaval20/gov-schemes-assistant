@@ -1,5 +1,13 @@
+import os
+import sys
 import json
 from langchain_core.messages import HumanMessage, AIMessage
+
+# Ensure repo root is on PYTHONPATH for production imports
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 from database.db import SessionLocal
 from database.models import SessionState
 import datetime
