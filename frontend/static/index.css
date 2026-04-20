@@ -67,7 +67,7 @@ body {
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(2px);
-  z-index: 99;
+  z-index: 2999;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -87,7 +87,7 @@ body {
   display: flex;
   flex-direction: column;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
-  z-index: 100;
+  z-index: 3000;
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   position: fixed;
@@ -97,9 +97,15 @@ body {
   transform: translateX(0);
 }
 
-/* Sidebar Push Logic for Desktop */
+/* Sidebar Push Logic - Uses transform for mobile and margin for desktop */
+.sidebar:not(.hidden)~.main-content {
+  transform: translateX(var(--sidebar-width));
+  flex-shrink: 0;
+}
+
 @media (min-width: 901px) {
   .sidebar:not(.hidden)~.main-content {
+    transform: none;
     margin-left: var(--sidebar-width);
     width: calc(100% - var(--sidebar-width));
   }
@@ -298,7 +304,7 @@ body.dark-mode .sidebar {
   position: relative;
   overflow: hidden;
   width: 100%;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -460,7 +466,7 @@ header::after {
   bottom: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 4000;
   display: none;
   align-items: center;
   justify-content: center;
@@ -646,107 +652,6 @@ header::after {
   border-color: var(--navy);
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   ── AUTOCOMPLETE BOX ──
-   ══════════════════════════════════════════════════════════════════ */
-.autocomplete-box {
-  position: absolute;
-  background: var(--card-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1.5px solid var(--border);
-  border-bottom: none; /* Merge with input border */
-  border-radius: 12px 12px 0 0; /* Only top corners rounded */
-  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.08); /* Shadow going upwards */
-  z-index: 1000;
-  max-height: 250px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: auto;
-}
-
-/* Match the input focus color when box is active */
-.autocomplete-box.active-border {
-  border-color: var(--saffron);
-}
-
-.autocomplete-box.hidden {
-  display: none;
-  opacity: 0;
-  transform: translateY(5px);
-}
-
-#question-input.has-autocomplete {
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
-}
-
-.autocomplete-item {
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  transition: background 0.2s;
-}
-
-.autocomplete-item:hover, .autocomplete-item.active {
-  background: rgba(0, 0, 128, 0.05);
-}
-
-body.dark-mode .autocomplete-item:hover, 
-body.dark-mode .autocomplete-item.active {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.autocomplete-item .scheme-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.autocomplete-item .scheme-category {
-  font-size: 11px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.autocomplete-item.category .category-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.autocomplete-item.category .category-icon {
-  font-size: 14px;
-  opacity: 0.6;
-}
-
-.autocomplete-header {
-  padding: 8px 14px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--saffron);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-
-/* Scrollbar for autocomplete */
-.autocomplete-box::-webkit-scrollbar {
-  width: 4px;
-}
-
-.autocomplete-box::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
 
 
 
@@ -883,6 +788,40 @@ body.dark-mode .welcome-card p {
   background: var(--user-bubble);
   color: white;
   border-top-right-radius: 4px;
+}
+
+/* Names Only Selection Buttons */
+.scheme-select-btn {
+  background: transparent;
+  border: 1px solid var(--navy);
+  color: var(--navy);
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-block;
+  text-align: left;
+  margin-bottom: 4px;
+}
+
+.scheme-select-btn:hover {
+  background: var(--navy);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 128, 0.15);
+}
+
+body.dark-mode .scheme-select-btn {
+  border-color: var(--saffron);
+  color: var(--saffron);
+}
+
+body.dark-mode .scheme-select-btn:hover {
+  background: var(--saffron);
+  color: var(--navy);
+  box-shadow: 0 4px 12px rgba(255, 153, 51, 0.2);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1114,7 +1053,7 @@ body.dark-mode .link-value:hover {
   flex-direction: column;
   opacity: 1;
   transform: translateY(0);
-  z-index: 1001;
+  z-index: 500;
 }
 
 body.dark-mode .suggestion-box {
@@ -1655,7 +1594,7 @@ body.dark-mode .tts-word.active {
   box-shadow: var(--shadow);
   display: none;
   flex-direction: column;
-  z-index: 2000;
+  z-index: 3500;
   margin-top: 12px;
   overflow: hidden;
   animation: slideDown 0.3s ease;
@@ -2365,4 +2304,21 @@ body.dark-mode .notif-item:hover {
   .notif-item {
     min-height: 48px;
   }
+}
+/* Agent Busy / Disable States */
+body.agent-busy .scheme-select-btn,
+body.agent-busy .clickable-scheme-name,
+body.agent-busy .suggestion-item,
+body.agent-busy .suggestion-pill,
+body.agent-busy #send-btn,
+body.agent-busy #mic-btn {
+  pointer-events: none !important;
+  opacity: 0.5 !important;
+  filter: grayscale(0.2);
+  cursor: wait !important;
+}
+
+body.agent-busy #question-input {
+    background: var(--bg-secondary);
+    color: var(--muted);
 }
