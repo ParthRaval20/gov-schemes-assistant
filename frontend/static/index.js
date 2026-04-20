@@ -47,7 +47,7 @@ function toggleVoice() {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         currentTranscript += event.results[i][0].transcript;
       }
-      
+
       if (currentTranscript) {
         input.value = currentTranscript;
         autoResize(input);
@@ -122,20 +122,20 @@ async function speakSequence(texts, btn, lang) {
 
   try {
     for (let i = 0; i < texts.length; i++) {
-        if (btn && btn.dataset.speaking === '0') break; 
-        if (texts[i].trim() === "") continue;
+      if (btn && btn.dataset.speaking === '0') break;
+      if (texts[i].trim() === "") continue;
 
-        await new Promise((resolve) => {
-            const url = `/tts?text=${encodeURIComponent(texts[i].trim())}&lang=${lang || currentLang}`;
-            const audio = new Audio(url);
-            currentAudio = audio;
-            audio.onplay = () => { if (btn) btn.textContent = '⏹ Stop'; };
-            const end = () => { currentAudio = null; resolve(); };
-            audio.onended = end;
-            audio.onerror = end;
-            audio.onpause = end;
-            audio.play().catch(end);
-        });
+      await new Promise((resolve) => {
+        const url = `/tts?text=${encodeURIComponent(texts[i].trim())}&lang=${lang || currentLang}`;
+        const audio = new Audio(url);
+        currentAudio = audio;
+        audio.onplay = () => { if (btn) btn.textContent = '⏹ Stop'; };
+        const end = () => { currentAudio = null; resolve(); };
+        audio.onended = end;
+        audio.onerror = end;
+        audio.onpause = end;
+        audio.play().catch(end);
+      });
 
 
     }
@@ -193,7 +193,7 @@ async function speakText(text, btn, lang) {
   if (btn) {
     btn.textContent = '⌛...';
     btn.dataset.speaking = '1';
-    
+
     audio.onplay = () => { btn.textContent = '⏹ Stop'; };
 
     const cleanup = () => {
@@ -250,13 +250,13 @@ function updateThemeIcon(isDark) {
 function initTheme() {
   const savedTheme = localStorage.getItem('theme');
   let isDark = false;
-  
+
   if (savedTheme) {
     isDark = savedTheme === 'dark';
   } else {
     isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
-  
+
   if (isDark) {
     document.body.classList.add('dark-mode');
   } else {
@@ -272,107 +272,107 @@ function closeAuthModal(e) {
 function switchAuthTab(tab) {
   const isLogin = tab === 'login';
   const isSignup = tab === 'signup';
-  
+
   document.getElementById('login-form').classList.toggle('active', isLogin);
   document.getElementById('signup-form').classList.toggle('active', isSignup);
-  
+
   // Hide forgot password forms when switching tabs
   document.getElementById('forgot-email-form').classList.remove('active');
   document.getElementById('forgot-otp-form').classList.remove('active');
   document.getElementById('forgot-reset-form').classList.remove('active');
-  
+
   // Update Tab Buttons
   const tabBtns = document.querySelectorAll('.tab-btn');
   if (tabBtns.length >= 2) {
-      tabBtns[0].classList.toggle('active', isLogin);
-      tabBtns[1].classList.toggle('active', isSignup);
-      // Show tabs if we are in login or signup
-      document.querySelector('.modal-tabs').style.display = (isLogin || isSignup) ? 'flex' : 'none';
+    tabBtns[0].classList.toggle('active', isLogin);
+    tabBtns[1].classList.toggle('active', isSignup);
+    // Show tabs if we are in login or signup
+    document.querySelector('.modal-tabs').style.display = (isLogin || isSignup) ? 'flex' : 'none';
   }
 }
 
 function showForgotPassword(e) {
-    if (e) e.preventDefault();
-    document.getElementById('login-form').classList.remove('active');
-    document.getElementById('signup-form').classList.remove('active');
-    document.getElementById('forgot-email-form').classList.add('active');
-    document.querySelector('.modal-tabs').style.display = 'none';
+  if (e) e.preventDefault();
+  document.getElementById('login-form').classList.remove('active');
+  document.getElementById('signup-form').classList.remove('active');
+  document.getElementById('forgot-email-form').classList.add('active');
+  document.querySelector('.modal-tabs').style.display = 'none';
 }
 
 async function handleForgotPasswordSubmit(e) {
-    if (e) e.preventDefault();
-    const email = document.getElementById('forgot-email-input').value;
-    if (!email) return alert("Please enter your email");
+  if (e) e.preventDefault();
+  const email = document.getElementById('forgot-email-input').value;
+  if (!email) return alert("Please enter your email");
 
-    // Clear any previous attempts from UI if needed
-    
-    try {
-        const res = await fetch('/forgot_password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('forgot-email-form').classList.remove('active');
-            document.getElementById('forgot-otp-form').classList.add('active');
-        } else {
-            alert(data.error);
-        }
-    } catch (err) {
-        alert("Something went wrong. Please try again.");
-        console.error("Forgot Password Error:", err);
+  // Clear any previous attempts from UI if needed
+
+  try {
+    const res = await fetch('/forgot_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('forgot-email-form').classList.remove('active');
+      document.getElementById('forgot-otp-form').classList.add('active');
+    } else {
+      alert(data.error);
     }
+  } catch (err) {
+    alert("Something went wrong. Please try again.");
+    console.error("Forgot Password Error:", err);
+  }
 }
 
 async function handleVerifyOTP() {
-    const email = document.getElementById('forgot-email-input').value;
-    const otp = document.getElementById('forgot-otp-input').value;
-    if (!otp || otp.length < 6) return alert("Please enter the 6-digit OTP");
+  const email = document.getElementById('forgot-email-input').value;
+  const otp = document.getElementById('forgot-otp-input').value;
+  if (!otp || otp.length < 6) return alert("Please enter the 6-digit OTP");
 
-    try {
-        const res = await fetch('/verify_otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, otp })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('forgot-otp-form').classList.remove('active');
-            document.getElementById('forgot-reset-form').classList.add('active');
-        } else {
-            alert(data.error);
-        }
-    } catch (err) {
-        alert("Verification failed.");
+  try {
+    const res = await fetch('/verify_otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      document.getElementById('forgot-otp-form').classList.remove('active');
+      document.getElementById('forgot-reset-form').classList.add('active');
+    } else {
+      alert(data.error);
     }
+  } catch (err) {
+    alert("Verification failed.");
+  }
 }
 
 async function handleResetPassword() {
-    const email = document.getElementById('forgot-email-input').value;
-    const otp = document.getElementById('forgot-otp-input').value;
-    const password = document.getElementById('forgot-new-password').value;
-    const confirm = document.getElementById('forgot-confirm-password').value;
+  const email = document.getElementById('forgot-email-input').value;
+  const otp = document.getElementById('forgot-otp-input').value;
+  const password = document.getElementById('forgot-new-password').value;
+  const confirm = document.getElementById('forgot-confirm-password').value;
 
-    if (!password) return alert("Please enter a new password");
-    if (password !== confirm) return alert("Passwords do not match");
+  if (!password) return alert("Please enter a new password");
+  if (password !== confirm) return alert("Passwords do not match");
 
-    try {
-        const res = await fetch('/reset_password', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, otp, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            alert("Password reset successfully! You can now login.");
-            switchAuthTab('login');
-        } else {
-            alert(data.error);
-        }
-    } catch (err) {
-        alert("Failed to reset password.");
+  try {
+    const res = await fetch('/reset_password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, password })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert("Password reset successfully! You can now login.");
+      switchAuthTab('login');
+    } else {
+      alert(data.error);
     }
+  } catch (err) {
+    alert("Failed to reset password.");
+  }
 }
 
 let currentUser = null;
@@ -382,7 +382,7 @@ let currentChatMessages = [];
 async function handleLogin() {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
-  const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })});
+  const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
   const data = await res.json();
   if (res.ok) { currentUser = data.user; updateUserUI(); toggleAuthModal(); loadHistory(); }
   else alert(data.error);
@@ -400,7 +400,7 @@ async function handleSignup() {
     residence: "Gujarat",
     occupation: document.getElementById('signup-occupation').value
   };
-  const res = await fetch('/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)});
+  const res = await fetch('/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json();
   if (res.ok) { currentUser = data.user; updateUserUI(); toggleAuthModal(); loadHistory(); }
   else alert(data.error);
@@ -419,40 +419,40 @@ function updateUserUI() {
 }
 
 function handleProfileClick() {
-    if (!currentUser) {
-        toggleAuthModal();
-    } else {
-        const dropdown = document.getElementById('profile-dropdown');
-        dropdown.classList.toggle('active');
-    }
+  if (!currentUser) {
+    toggleAuthModal();
+  } else {
+    const dropdown = document.getElementById('profile-dropdown');
+    dropdown.classList.toggle('active');
+  }
 }
 
 // Close dropdown when clicking outside
 window.addEventListener('click', (e) => {
-    const btn = document.getElementById('user-profile-btn');
-    const dropdown = document.getElementById('profile-dropdown');
-    if (btn && !btn.contains(e.target) && dropdown) {
-        dropdown.classList.remove('active');
-    }
+  const btn = document.getElementById('user-profile-btn');
+  const dropdown = document.getElementById('profile-dropdown');
+  if (btn && !btn.contains(e.target) && dropdown) {
+    dropdown.classList.remove('active');
+  }
 });
 
 function toggleProfileModal(event) {
   if (event) event.stopPropagation();
   const modal = document.getElementById('profile-modal');
   modal.classList.toggle('active');
-  
+
   if (modal.classList.contains('active') && currentUser) {
     // Note: We need to fetch full profile data from /me to pre-fill
     fetch('/me').then(res => res.json()).then(data => {
-        if (data.user) {
-            document.getElementById('profile-name').value = data.user.name || "";
-            document.getElementById('profile-age').value = data.user.age || "";
-            document.getElementById('profile-income').value = data.user.income || "";
-            document.getElementById('profile-category').value = data.user.category || "General";
-            document.getElementById('profile-gender').value = data.user.gender || "Male";
-            document.getElementById('profile-occupation').value = data.user.occupation || "";
-            document.getElementById('profile-email-notif').checked = data.user.email_notifications;
-        }
+      if (data.user) {
+        document.getElementById('profile-name').value = data.user.name || "";
+        document.getElementById('profile-age').value = data.user.age || "";
+        document.getElementById('profile-income').value = data.user.income || "";
+        document.getElementById('profile-category').value = data.user.category || "General";
+        document.getElementById('profile-gender').value = data.user.gender || "Male";
+        document.getElementById('profile-occupation').value = data.user.occupation || "";
+        document.getElementById('profile-email-notif').checked = data.user.email_notifications;
+      }
     });
   }
 }
@@ -492,7 +492,7 @@ async function handleUpdateProfile() {
 async function handleLogout(event) {
   if (event) event.stopPropagation();
   if (!confirm("Are you sure you want to log out?")) return;
-  
+
   await fetch('/logout', { method: 'POST' });
   currentUser = null;
   currentChatId = null;
@@ -520,15 +520,15 @@ async function loadHistory() {
   const items = await res.json();
   const list = document.getElementById('history-list');
   list.innerHTML = '';
-  
+
   items.forEach(item => {
     const div = document.createElement('div');
     div.className = `history-item ${currentChatId == item.id ? 'active' : ''}`;
     div.onclick = (e) => {
-        // Only switch if we didn't click the menu
-        if (!e.target.closest('.history-menu-btn') && !e.target.closest('.history-dropdown')) {
-            switchChat(item);
-        }
+      // Only switch if we didn't click the menu
+      if (!e.target.closest('.history-menu-btn') && !e.target.closest('.history-dropdown')) {
+        switchChat(item);
+      }
     };
 
     div.innerHTML = `
@@ -598,7 +598,7 @@ async function deleteChat(event, id) {
 
   if (res.ok) {
     if (currentChatId === id) {
-        clearChatUI();
+      clearChatUI();
     }
     loadHistory();
   } else {
@@ -607,9 +607,9 @@ async function deleteChat(event, id) {
 }
 
 function clearChatUI() {
-    currentChatId = null;
-    currentChatMessages = [];
-    chat.innerHTML = `<div class="welcome-card">
+  currentChatId = null;
+  currentChatMessages = [];
+  chat.innerHTML = `<div class="welcome-card">
         <span class="wheel">☸️</span>
         <h2>New conversation started!</h2>
         <p>Ask me about any Gujarat government scheme.</p>
@@ -628,16 +628,16 @@ function switchChat(chatData) {
 async function saveChat(userMsg, aiResult) {
   if (!currentUser) return;
   currentChatMessages.push({ role: 'user', content: userMsg }, { role: 'assistant', result: aiResult });
-  
+
   // Only suggest/send a title on the very first message save of a new chat
   const title = (currentChatId === null) ? currentChatMessages[0].content.substring(0, 30) : null;
-  
-  const res = await fetch('/save_chat', { 
-    method: 'POST', 
-    headers: { 'Content-Type': 'application/json' }, 
+
+  const res = await fetch('/save_chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: currentChatId, title, messages: currentChatMessages })
   });
-  
+
   const data = await res.json();
   if (res.ok) { currentChatId = data.chat_id; loadHistory(); }
 }
@@ -651,14 +651,14 @@ function autoResize(el) {
 
 function handleKey(e) {
   if (isAgentBusy) return;
-  if (e.key === 'Enter' && !e.shiftKey) { 
+  if (e.key === 'Enter' && !e.shiftKey) {
     if (typeof suggestionBox !== 'undefined' && suggestionBox && !suggestionBox.classList.contains('hidden')) {
       if (typeof selectedSuggestionIndex !== 'undefined' && selectedSuggestionIndex > -1) {
-        return; 
+        return;
       }
     }
-    e.preventDefault(); 
-    sendMessage(); 
+    e.preventDefault();
+    sendMessage();
   }
 }
 
@@ -709,16 +709,16 @@ function removeTyping() {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 }
 
 function escapeXml(s) {
   if (!s) return "";
   return s.replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&apos;');
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function renderResult(result) {
@@ -742,7 +742,7 @@ function renderResult(result) {
     const schemes = result.schemes || [];
     const replyText = result.reply || (currentLang === 'hi' ? 'मुझे ये योजनाएं मिलीं:' : (currentLang === 'gu' ? 'મને આ યોજનાઓ મળી:' : 'I found these schemes:'));
     const speakId = 'speak-' + Date.now();
-    
+
     const pillNames = schemes.map(s => s.scheme_name).filter(Boolean);
     const sequenceBody = [replyText, ...pillNames];
 
@@ -761,10 +761,10 @@ function renderResult(result) {
         💡 Click on any scheme above to see full details.
       </div>
     </div>`;
-    
+
     setTimeout(() => {
-        const btn = document.getElementById(speakId);
-        if (btn) btn.onclick = () => speakSequence(sequenceBody, btn, result.lang || currentLang);
+      const btn = document.getElementById(speakId);
+      if (btn) btn.onclick = () => speakSequence(sequenceBody, btn, result.lang || currentLang);
     }, 10);
   }
   else if (result.type === 'specific_field') {
@@ -782,7 +782,7 @@ function renderResult(result) {
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml;
       const card = temp.firstElementChild;
-      
+
       // Manual binding for Listen button
       const btn = card.querySelector('.speak-btn');
       if (btn) {
@@ -803,19 +803,19 @@ function renderResult(result) {
     const profileLines = Object.entries({
       'Age': profile.age, 'Income': profile.income, 'Occupation': profile.occupation,
       'State': profile.state, 'Gender': profile.gender, 'Caste/Category': profile.caste_category
-    }).filter(([,v]) => v).map(([k,v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
+    }).filter(([, v]) => v).map(([k, v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
 
     const schemeCards = schemes.map((s, i) => `
       <div style="background:var(--ai-bubble);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:8px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-          <span style="background:var(--green);color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</span>
+          <span style="background:var(--green);color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i + 1}</span>
           <strong class="clickable-scheme-name" onclick="askQuestion('${(s.scheme_name || '').replace(/'/g, "\\'")}')" style="color:var(--saffron);font-size:14px;cursor:pointer;text-decoration:underline">${escapeHtml(s.scheme_name || '')}</strong>
         </div>
         ${s.why_eligible ? `<div style="color:#138808;font-size:12px;margin-top:4px">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
         ${s.category ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📂 ${escapeHtml(s.category)}</div>` : ''}
         ${s.state ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📍 ${escapeHtml(s.state)}</div>` : ''}
-        ${s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
-          ? `<div style="margin-top:6px"><a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value">🔗 Visit Official Site ↗</a></div>` : ''}
+        ${s.official_link && !['not available', 'n/a', 'none', ''].includes((s.official_link || '').toLowerCase())
+        ? `<div style="margin-top:6px"><a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value">🔗 Visit Official Site ↗</a></div>` : ''}
       </div>`).join('');
 
     content = `<div class="bubble ai">
@@ -831,7 +831,7 @@ function renderResult(result) {
     const profileLines = Object.entries({
       'Age': profile.age, 'Income': profile.income, 'Occupation': profile.occupation,
       'State': profile.state, 'Gender': profile.gender, 'Caste/Category': profile.caste_category
-    }).filter(([,v]) => v).map(([k,v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
+    }).filter(([, v]) => v).map(([k, v]) => `<span style="margin-right:12px">• <b>${k}:</b> ${escapeHtml(String(v))}</span>`).join('');
 
     const eligible = schemes.filter(s => s.is_eligible);
     const notEligible = schemes.filter(s => !s.is_eligible);
@@ -844,8 +844,8 @@ function renderResult(result) {
         <div>
           <div class="clickable-scheme-name" onclick="askQuestion('${(s.scheme_name || '').replace(/'/g, "\\'")}')" style="font-weight:600;font-size:13px;color:var(--saffron);cursor:pointer;text-decoration:underline">${escapeHtml(s.scheme_name || '')}</div>
           <div style="font-size:12px;color:${color};margin-top:2px">${escapeHtml(s.reason || '')}</div>
-          ${s.is_eligible && s.official_link && !['not available','n/a','none',''].includes((s.official_link||'').toLowerCase())
-            ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;margin-top:4px;display:inline-block">🔗 Apply here ↗</a>` : ''}
+          ${s.is_eligible && s.official_link && !['not available', 'n/a', 'none', ''].includes((s.official_link || '').toLowerCase())
+          ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value" style="font-size:12px;margin-top:4px;display:inline-block">🔗 Apply here ↗</a>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -887,7 +887,7 @@ function renderResult(result) {
     } else if (result.type === 'names_only' && result.reply) {
       const pillNames = (result.schemes || []).map(s => s.scheme_name).filter(Boolean);
       const sequenceBody = [result.reply, ...pillNames];
-      
+
       setTimeout(() => {
         const btn = row.querySelector('.speak-btn');
         if (autoReadEnabled) speakSequence(sequenceBody, btn, responseLang);
@@ -901,7 +901,7 @@ function renderResult(result) {
 
     } else if (result.type === 'full_detail' && result.schemes?.length) {
       msgToSpeak = result.schemes.map((s, i) =>
-        `Scheme ${i+1}: ${s.scheme_name || ''}. ` +
+        `Scheme ${i + 1}: ${s.scheme_name || ''}. ` +
         (s.description ? `${s.description}. ` : '') +
         (s.benefits ? `${s.benefits}. ` : '') +
         (s.eligibility ? `${s.eligibility}.` : '')
@@ -909,7 +909,7 @@ function renderResult(result) {
 
     } else if (result.type === 'eligibility_result' && result.schemes?.length) {
       msgToSpeak = result.schemes.map((s, i) =>
-        `${i+1}: ${s.scheme_name || ''}. ${s.why_eligible || ''}`
+        `${i + 1}: ${s.scheme_name || ''}. ${s.why_eligible || ''}`
       ).join('. ');
 
     } else if (result.type === 'eligibility_for_shown' && result.schemes?.length) {
@@ -927,7 +927,7 @@ function renderResult(result) {
         const btn = row.querySelector('.speak-btn');
         // Instantly start reading if autoReadEnabled is ON
         if (autoReadEnabled) {
-           speakText(msgToSpeak, btn, responseLang);
+          speakText(msgToSpeak, btn, responseLang);
         }
       }, 50);
     }
@@ -942,8 +942,8 @@ function wrapWordsInBubble(el) {
       const p = node.parentElement;
       if (!p) return NodeFilter.FILTER_REJECT;
       // Skip interactive or non-visible elements
-      if (['BUTTON','A','SCRIPT','STYLE','SPAN'].includes(p.tagName)) {
-         if (!p.classList.contains('field-value')) return NodeFilter.FILTER_REJECT;
+      if (['BUTTON', 'A', 'SCRIPT', 'STYLE', 'SPAN'].includes(p.tagName)) {
+        if (!p.classList.contains('field-value')) return NodeFilter.FILTER_REJECT;
       }
       if (p.classList.contains('tts-word') || p.classList.contains('step-marker') || p.classList.contains('bullet-marker')) return NodeFilter.FILTER_REJECT;
       if (node.textContent.trim() === '') return NodeFilter.FILTER_REJECT;
@@ -953,14 +953,14 @@ function wrapWordsInBubble(el) {
   const nodes = [];
   let current;
   while (current = walker.nextNode()) nodes.push(current);
-  
+
   nodes.forEach(node => {
     const parent = node.parentNode;
     const text = node.textContent;
     // Split by whitespace but keep whitespace
     const parts = text.split(/(\s+)/);
     const fragment = document.createDocumentFragment();
-    
+
     parts.forEach(part => {
       if (/^\s+$/.test(part)) {
         fragment.appendChild(document.createTextNode(part));
@@ -976,13 +976,13 @@ function wrapWordsInBubble(el) {
 }
 
 function formatStructuredText(text) {
-  if (!text || ['not available','n/a','none',''].includes(String(text).toLowerCase())) {
+  if (!text || ['not available', 'n/a', 'none', ''].includes(String(text).toLowerCase())) {
     return `<span class="field-value" style="color:var(--muted)">Not available</span>`;
   }
 
   // Handle both literal \n and <br>
   const lines = String(text).split(/\r?\n|<br>/).filter(l => l.trim().length > 0);
-  
+
   if (lines.length <= 1 && !/^[0-9]+[\.\)]|^\s*[\•\-\*]/.test(text)) {
     return `<span class="field-value">${escapeHtml(text)}</span>`;
   }
@@ -1016,7 +1016,7 @@ function unwrapWordsInBubble(el) {
 }
 
 function buildSchemeCard(s, i) {
-  const link = s.official_link && !['not available','n/a','none',''].includes(s.official_link.toLowerCase())
+  const link = s.official_link && !['not available', 'n/a', 'none', ''].includes(s.official_link.toLowerCase())
     ? `<a href="${escapeHtml(s.official_link)}" target="_blank" class="link-value">🔗 Visit Official Site ↗</a>`
     : `<span class="field-value" style="color:var(--muted)">Not available</span>`;
 
@@ -1089,7 +1089,7 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q, lang: currentLang })
     });
-    
+
     if (!res.ok) {
       removeTyping();
       renderResult({ error: 'Network error. Please try again.' });
@@ -1099,7 +1099,7 @@ async function sendMessage() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let buffer = '';
-    
+
     let streamingRow = null;
     let streamingBubble = null;
     let fullText = '';
@@ -1112,7 +1112,7 @@ async function sendMessage() {
       buffer += decoder.decode(value, { stream: true });
       let lines = buffer.split('\n');
       buffer = lines.pop();
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
@@ -1137,20 +1137,43 @@ async function sendMessage() {
                 renderResult(result);
                 saveChat(q, result);
               }
-            } else if (data.type === 'schemes_start') {
+            } else if (data.type === 'schemes_start' || data.type === 'eligibility_start') {
               removeTyping();
               const row = document.createElement('div');
               row.className = 'msg-row ai';
-              row.innerHTML = `<div class="avatar ai">🤖</div><div class="schemes-wrapper" id="streaming-schemes"></div>`;
+
+              let profileHtml = '';
+              if (data.type === 'eligibility_start' && data.profile) {
+                const p = data.profile;
+                const profileLines = Object.entries({
+                  'Age': p.age, 'Income': p.income, 'Occupation': p.occupation,
+                  'State': p.state, 'Gender': p.gender, 'Caste': p.caste_category
+                }).filter(([, v]) => v).map(([k, v]) => `• <b>${k}:</b> ${v}`).join('  ');
+
+                profileHtml = `<div style="margin-bottom:12px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); padding-bottom:8px;">
+                  <strong style="color:var(--saffron)">🎯 Eligibility for Profile:</strong><br>${profileLines}
+                </div>`;
+              }
+
+              row.innerHTML = `<div class="avatar ai">🤖</div>
+                <div class="schemes-wrapper" id="streaming-schemes">
+                  ${profileHtml}
+                  <div class="stream-loader" style="color:var(--muted); font-size:12px; font-style:italic; padding:10px; display:flex; align-items:center; gap:8px;">
+                    <span class="spinner-small"></span> 🔍 Fetching latest details...
+                  </div>
+                </div>`;
               chat.appendChild(row);
               schemesWrapper = row.querySelector('#streaming-schemes');
             } else if (data.type === 'scheme_card') {
               if (schemesWrapper) {
+                const loader = schemesWrapper.querySelector('.stream-loader');
+                if (loader) loader.remove();
+
                 const cardHtml = buildSchemeCard(data.scheme, data.index);
                 const temp = document.createElement('div');
                 temp.innerHTML = cardHtml;
                 const card = temp.firstElementChild;
-                
+
                 // Manual binding for Listen button
                 const btn = card.querySelector('.speak-btn');
                 if (btn) {
@@ -1163,10 +1186,40 @@ async function sendMessage() {
                 requestAnimationFrame(() => { card.style.opacity = '1'; card.style.transform = 'translateY(0)'; });
                 scrollBottom();
               }
-            } else if (data.type === 'schemes_end') {
-               // Full detail schemes are handled by individual cards usually, 
-               // but for saving we might want the full list.
-               // RAG agent usually sends individual cards or full detail if asked.
+            } else if (data.type === 'names_only_start') {
+              removeTyping();
+              streamingRow = document.createElement('div');
+              streamingRow.className = 'msg-row ai';
+              const speakId = 'speak-' + Date.now();
+              streamingRow.innerHTML = `
+                <div class="avatar ai">🤖</div>
+                <div class="bubble ai" style="border: 1px solid var(--saffron); background: rgba(255,103,31,0.02); padding: 15px;">
+                  <div style="font-weight: 600; color: var(--saffron); margin-bottom: 8px; font-family: 'Rajdhani', sans-serif; font-size: 15px;">
+                    📋 ${escapeHtml(data.reply)}
+                    <br><button class="speak-btn" id="${speakId}" data-speaking="0" style="margin-top:5px">🔊 Listen</button>
+                  </div>
+                  <div class="pills-container" style="display:flex;flex-wrap:wrap;gap:8px;">
+                    <div class="stream-loader" style="color:var(--muted); font-size:12px; font-style:italic;">🔍 Translating schemes...</div>
+                  </div>
+                </div>`;
+              chat.appendChild(streamingRow);
+              streamingBubble = streamingRow.querySelector('.pills-container');
+            } else if (data.type === 'names_only_pill') {
+              if (streamingBubble) {
+                const loader = streamingBubble.querySelector('.stream-loader');
+                if (loader) loader.remove();
+
+                const s = data.scheme;
+                const pill = document.createElement('button');
+                pill.className = 'scheme-select-btn';
+                pill.textContent = s.scheme_name;
+                pill.onclick = () => askQuestion(s.scheme_name);
+                streamingBubble.appendChild(pill);
+                scrollBottom();
+              }
+            } else if (data.type === 'names_only_end' || data.type === 'schemes_end') {
+              data.type = data.type === 'names_only_end' ? 'names_only' : 'full_detail';
+              saveChat(q, data);
             } else if (data.type === 'convert_to_cards') {
               if (streamingRow) streamingRow.remove();
               data.type = 'full_detail'; data.lang = serverLang;
@@ -1178,8 +1231,8 @@ async function sendMessage() {
               renderResult(data);
               saveChat(q, data);
             }
-          } catch(e) {
-             console.error("Error processing stream line:", e, line);
+          } catch (e) {
+            console.error("Error processing stream line:", e, line);
           }
         }
       }
@@ -1212,7 +1265,7 @@ const LANG_UI = {
     placeholder: "Ask about any government scheme…",
     hint: "Press Enter to send · Shift+Enter for new line",
     chips: [
-      "Schemes for farmers 🌾", "Women welfare schemes", "Education scholarships",
+      "Schemes for farmers", "Women welfare schemes", "Education scholarships",
       "Healthcare schemes", "housing scheme",
       "Startup schemes for youth", "Schemes in Gujarat", "Skill development programs"
     ]
@@ -1221,16 +1274,16 @@ const LANG_UI = {
     placeholder: "सरकारी योजना के बारे में पूछें…",
     hint: "Enter दबाएं भेजने के लिए · Shift+Enter नई लाइन के लिए",
     chips: [
-      "किसानों के लिए योजनाएं 🌾", "महिला कल्याण योजनाएं", "शिक्षा छात्रवृत्ति",
+      "किसानों के लिए योजनाएं", "महिला कल्याण योजनाएं", "शिक्षा छात्रवृत्ति",
       "स्वास्थ्य योजनाएं", "आवास योजना",
-      "युवाओं के लिए स्टार्टअप योजनाएं", "गुजरात में योजनाएं", "कૌશલ विकास कार्यक्रम"
+      "युवाओं के लिए स्टार्टअप योजनाएं", "गुजरात में योजनाएं", "कौशल विकास कार्यक्रम"
     ]
   },
   gu: {
     placeholder: "સરકારી યોજના વિશે પૂછો…",
     hint: "Enter દબાવો મોકલવા માટે · Shift+Enter નવી લીટી માટે",
     chips: [
-      "ખેડૂતો માટે યોજનાઓ 🌾", "મહિલા કલ્યાણ યોજનાઓ", "શિક્ષણ શિષ્યવૃત્તિ",
+      "ખેડૂતો માટે યોજનાઓ", "મહિલા કલ્યાણ યોજનાઓ", "શિક્ષણ શિષ્યવૃત્તિ",
       "આરોગ્ય સેવા યોજનાઓ", "આવાસ યોજના",
       "યુવાનો માટે સ્ટાર્ટઅપ યોજનાઓ", "ગુજરાતમાં યોજનાઓ", "કૌશલ્ય વિકાસ કાર્યક્રમ"
     ]
@@ -1323,12 +1376,12 @@ window.addEventListener('click', (e) => {
 
 // Update window.onload to also fetch notifications
 window.onload = async () => {
-    if (originalOnload) await originalOnload();
-    if (currentUser) {
-        loadNotifications();
-        // Check for new notifications every 5 minutes
-        setInterval(loadNotifications, 5 * 60 * 1000);
-    }
+  if (originalOnload) await originalOnload();
+  if (currentUser) {
+    loadNotifications();
+    // Check for new notifications every 5 minutes
+    setInterval(loadNotifications, 5 * 60 * 1000);
+  }
 };
 
 // ── Suggestion Box Logic ───────────────────────────────────────────────────
@@ -1337,7 +1390,7 @@ let selectedSuggestionIndex = -1;
 
 const QUICK_START = {
   en: [
-    { text: "Schemes for farmers 🌾", icon: "🌾", category: "Quick Start" },
+    { text: "Schemes for farmers", icon: "🌾", category: "Quick Start" },
     { text: "Women welfare schemes", icon: "👩‍👧", category: "Quick Start" },
     { text: "Education scholarships", icon: "🎓", category: "Quick Start" },
     { text: "Healthcare schemes", icon: "🏥", category: "Quick Start" },
@@ -1387,12 +1440,12 @@ function debouncedFetchSuggestions(q) {
 async function fetchSuggestions(q) {
   // Autocomplete ONLY works for English as requested
   if (currentLang !== 'en') {
-      // If not English, still show Quick Start or clear? 
-      // Requirement says "this only work for english" for scheme names.
-      // So we don't fetch from backend if not 'en'.
-      return;
+    // If not English, still show Quick Start or clear? 
+    // Requirement says "this only work for english" for scheme names.
+    // So we don't fetch from backend if not 'en'.
+    return;
   }
-  
+
   try {
     const res = await fetch(`/suggest?q=${encodeURIComponent(q)}`);
     const data = await res.json();
@@ -1411,14 +1464,14 @@ function renderSuggestions(list) {
     suggestionBox.classList.add('hidden');
     return;
   }
-  
+
   suggestionBox.innerHTML = list.map((item, idx) => `
     <div class="suggestion-item" onclick="selectSuggestion('${item.text.replace(/'/g, "\\'")}')" data-index="${idx}">
       <span class="icon">${item.icon || '📌'}</span>
       <span class="text">${item.text}</span>
     </div>
   `).join('');
-  
+
   suggestionBox.classList.remove('hidden');
   selectedSuggestionIndex = -1;
 }
@@ -1435,15 +1488,15 @@ function selectSuggestion(text) {
 function moveSelection(direction) {
   const items = suggestionBox.querySelectorAll('.suggestion-item');
   if (items.length === 0) return;
-  
+
   items.forEach(i => i.classList.remove('selected'));
-  
+
   if (direction === 'down') {
     selectedSuggestionIndex = (selectedSuggestionIndex + 1) % items.length;
   } else {
     selectedSuggestionIndex = (selectedSuggestionIndex - 1 + items.length) % items.length;
   }
-  
+
   const selected = items[selectedSuggestionIndex];
   selected.classList.add('selected');
   selected.scrollIntoView({ block: 'nearest' });
@@ -1456,7 +1509,7 @@ input.addEventListener('blur', hideSuggestions);
 
 // Update handleKey to support Arrow navigation
 const originalHandleKey = handleKey;
-window.handleKey = function(e) {
+window.handleKey = function (e) {
   if (suggestionBox && !suggestionBox.classList.contains('hidden')) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();

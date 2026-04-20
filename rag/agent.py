@@ -147,6 +147,12 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
     def ls(key: str) -> str:
         return get_string(key, lang)
 
+    def _process_and_translate_scheme(d: dict) -> dict:
+        d = apply_visit_site_fallback(d)
+        if lang != "en":
+            d = translate_scheme_dict(d, lang)
+        return d
+
     PROFILE_REQUEST = ls("profile_request")
     awaiting_profile = session.get("awaiting_profile", False)
 
@@ -218,10 +224,27 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
             yield {"type": "conversational", "reply": reply, "lang": lang}
             return
 
+        # Stream eligibility results
+        yield {"type": "eligibility_start", "profile": profile.model_dump(), "lang": lang}
+        
         save_to_history(session_id, question, f"Found {len(eligible)} eligible schemes.")
         session["last_schemes"] = eligible
-        yield {"type": "eligibility_result", "profile": profile.model_dump(), "schemes": _translate_scheme_names(eligible, lang), "lang": lang}
-
+        
+        dicts = [s.model_dump() for s in eligible]
+        results = [None] * len(dicts)
+        
+        with ThreadPoolExecutor(max_workers=max(1, min(len(dicts), 5))) as ex:
+            futures = {ex.submit(_process_and_translate_scheme, d): i for i, d in enumerate(dicts)}
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    res_dict = future.result()
+                except Exception:
+                    res_dict = dicts[idx]
+                results[idx] = res_dict
+                yield {"type": "scheme_card", "scheme": res_dict, "index": idx + 1, "lang": lang}
+                
+        yield {"type": "schemes_end", "schemes": results, "lang": lang}
         return
 
     # \u2500\u2500 User asks eligibility for previously shown schemes 
@@ -237,15 +260,23 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
             if schemes:
                 selected = schemes[:5]
                 save_to_history(session_id, question, f"Showed schemes: {', '.join(s.scheme_name for s in selected)}")
+                
+                yield {"type": "schemes_start", "lang": lang}
+                
                 dicts = [s.model_dump() for s in selected]
+                results = [None] * len(dicts)
                 with ThreadPoolExecutor(max_workers=min(len(dicts), 5)) as ex:
-                    enriched = list(ex.map(apply_visit_site_fallback, dicts))
-                yield {"type": "conversational_end"}
-                yield {
-                    "type": "full_detail",
-                    "schemes": enriched,
-                    "lang": lang,
-                }
+                    futures = {ex.submit(_process_and_translate_scheme, d): i for i, d in enumerate(dicts)}
+                    for future in as_completed(futures):
+                        idx = futures[future]
+                        try:
+                            res_dict = future.result()
+                        except Exception:
+                            res_dict = dicts[idx]
+                        results[idx] = res_dict
+                        yield {"type": "scheme_card", "scheme": res_dict, "index": idx + 1, "lang": lang}
+                
+                yield {"type": "schemes_end", "schemes": results, "lang": lang}
                 return
             else:
                 reply = reply_in_lang(ls("no_schemes_found"))
@@ -473,11 +504,18 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
             
         # Use a localized summary message instead of a raw numbered list
         reply = ls("found_schemes")
-        save_to_history(session_id, question, reply)
 
-        # Send full list for UI rendering (clickable chips) directly
+        # Stream names_only pills (YIELD START IMMEDIATELY)
+        yield {"type": "names_only_start", "reply": reply, "lang": lang}
+        
+        save_to_history(session_id, question, reply)
         scheme_dicts = [s.model_dump() for s in selected]
-        yield {"type": "names_only", "reply": reply, "schemes": _translate_scheme_names(scheme_dicts, lang), "lang": lang}
+        translated_schemes = _translate_scheme_names(scheme_dicts, lang)
+        
+        for i, s in enumerate(translated_schemes):
+            yield {"type": "names_only_pill", "scheme": s, "index": i, "lang": lang}
+        
+        yield {"type": "names_only_end", "reply": reply, "schemes": translated_schemes, "lang": lang}
         return
 
 
@@ -503,6 +541,7 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
         return
 
     # full_detail   Stream TEXT -> then render CARDS
+    # full_detail   Stream individual CARDS one-by-one as they are ready
     # Filter out invalid or hallucinated names
     invalid_names = {"scheme name", "not available", "not found", "none", "n/a", "unknown", "scheme"}
     selected = [s for s in schemes if s.scheme_name.lower().strip() not in invalid_names]
@@ -515,43 +554,29 @@ def ask_agent(question: str, session_id: str = "user_1", ui_lang: str = None, us
         return
 
     save_to_history(session_id, question, f"Showed details for: {', '.join(s.scheme_name for s in selected)}")
+    
+    # Yield start event IMMEDIATELY before slow work
+    yield {"type": "schemes_start", "lang": lang}
+    
     dicts = [s.model_dump() for s in selected]
 
-    preview_parts = []
-    for i, d in enumerate(dicts):
-        benefits_short = str(d.get("benefits", ""))[:150]
-        preview_parts.append(f"**{i+1}. {d['scheme_name']}**\nBenefits: {benefits_short}...\n")
-    
-    preview_text = "Here are the details:\n\n" + "\n".join(preview_parts) + "\n*Loading cards...*"
-    preview_text = reply_in_lang(preview_text)
-    
-    def _process_and_translate_scheme(d: dict) -> dict:
-        d = apply_visit_site_fallback(d)
-        if lang != "en":
-            d = translate_scheme_dict(d, lang)
-        return d
-
-    # Run enrichment and translation in background WHILE streaming text
+    # Run enrichment and translation in parallel and yield as they complete
+    results = [None] * len(dicts)
     with ThreadPoolExecutor(max_workers=max(1, min(len(dicts), 5))) as ex:
         futures = {ex.submit(_process_and_translate_scheme, d): i for i, d in enumerate(dicts)}
         
-        # Stream the typing effect text
-        yield {"type": "conversational_start", "lang": lang}
-        words = preview_text.split(" ")
-        for i, word in enumerate(words):
-            chunk = word if i == 0 else " " + word
-            yield {"type": "chunk", "text": chunk}
-            time.sleep(0.03)  # simulates typing and masks the web scraping latency
-        
-        # Ensure we don't accidentally send a conversational_end yet, we just pause
-        results = [None] * len(dicts)
         for future in as_completed(futures):
             idx = futures[future]
             try:
-                results[idx] = future.result()
-            except Exception:
-                results[idx] = dicts[idx]
+                res_dict = future.result()
+            except Exception as e:
+                print(f"[full_detail] Streaming error for scheme {idx}: {e}")
+                res_dict = dicts[idx]
+            
+            results[idx] = res_dict
+            # Yield individual card for true streaming
+            yield {"type": "scheme_card", "scheme": res_dict, "index": idx + 1, "lang": lang}
 
-    # Convert the streamed text bubble into cards!
-    yield {"type": "convert_to_cards", "schemes": results, "lang": lang}
+    # Signal completion and provide full list for history saving
+    yield {"type": "schemes_end", "schemes": results, "lang": lang}
     return
