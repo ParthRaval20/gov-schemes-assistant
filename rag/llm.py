@@ -1,8 +1,8 @@
 import os
 from langchain_mistralai import ChatMistralAI
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Union, Any
 
 # -------------------------------------------------
 # Schemas
@@ -18,6 +18,15 @@ class SchemeOutput(BaseModel):
     application_process: str = Field(description="Steps to apply for the scheme")
     state: str = Field(description="State where the scheme is applicable")
     official_link: str = Field(description="Official website or link for the scheme")
+
+    @field_validator('benefits', 'eligibility', 'documents_required', 'application_process', 'description', 'category', mode='before')
+    @classmethod
+    def ensure_string(cls, v: Any) -> str:
+        if v is None:
+            return ""
+        if isinstance(v, list):
+            return "\n".join([str(item) for item in v if item])
+        return str(v)
 
 class SchemesListOutput(BaseModel):
     schemes: List[SchemeOutput] = Field(description="List of all government schemes found in the context")
