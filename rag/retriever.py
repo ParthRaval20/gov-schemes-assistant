@@ -6,6 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from rag.llm import get_vector_db, get_structured_llm, get_minimal_structured_llm, SchemeOutput
 from rag.utils import format_docs, scheme_name_similarity
 from rag.intent import is_direct_scheme_name_query, rewrite_question
+from langchain_core.documents import Document
+
 
 EXTRACTION_SYSTEM = """You are a helpful government scheme expert.
 Your task is to identify and extract relevant schemes from the provided context that match the user's query or category.
@@ -102,7 +104,7 @@ def _sql_fallback_search(query: str, k: int = 5):
     when vector search returns empty (e.g. documents table is empty).
     Returns list of Document objects matching the format expected by the RAG pipeline.
     """
-    from langchain_core.documents import Document
+
     try:
         from database.db import SessionLocal
         from database.models import Scheme
@@ -204,7 +206,7 @@ def _sql_exact_name_match(scheme_name: str) -> List[Document]:
     Tries to find an EXACT or very close match in the SQL database.
     This bypasses vector search noise for known names.
     """
-    from langchain_core.documents import Document
+
     try:
         from database.db import SessionLocal
         from database.models import Scheme
