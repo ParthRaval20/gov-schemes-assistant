@@ -8,9 +8,20 @@ def is_direct_scheme_name_query(question: str) -> bool:
     # Support shorter scheme names like "Vahali Dikri Yojana" (3 words)
     if len(words) < 3:
         return False
+
+    q_lower = q.lower()
+
+    # GUARD: Category/topic phrases are NOT specific scheme names
+    category_phrases = [
+        "schemes for", "scheme for", "welfare schemes", "schemes in",
+        "scholarships", "healthcare schemes", "housing scheme",
+        "startup schemes", "development programs", "farmer scheme",
+        "women scheme", "education scheme", "skill development",
+    ]
+    if any(cp in q_lower for cp in category_phrases):
+        return False
         
     conversational_starters = ["give me", "show me", "tell me", "find me", "what is", "which", "how", "can i", "do i", "am i", "is there", "are there"]
-    q_lower = q.lower()
     if any(q_lower.startswith(s) for s in conversational_starters):
         return False
         
