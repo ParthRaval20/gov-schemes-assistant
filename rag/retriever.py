@@ -3,6 +3,7 @@ import time
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
 from rag.llm import get_vector_db, get_structured_llm, get_minimal_structured_llm, SchemeOutput
 from rag.utils import format_docs, scheme_name_similarity
 from rag.intent import is_direct_scheme_name_query, rewrite_question
@@ -161,7 +162,6 @@ def _sql_fallback_search(query: str, k: int = 5):
     when vector search returns empty (e.g. documents table is empty).
     Returns list of Document objects matching the format expected by the RAG pipeline.
     """
-    from langchain_core.documents import Document
     try:
         from database.db import SessionLocal
         from database.models import Scheme
