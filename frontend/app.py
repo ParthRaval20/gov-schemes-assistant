@@ -983,13 +983,18 @@ def reset():
     from rag.memory import store as rag_store
     data = request.get_json(silent=True) or {}
     
-    # If a specific chat thread is being closed/cleared, remove it from in-memory RAG store
+    # 1. Clear any specific thread memory passed from frontend
     old_chat_id = data.get("chat_id")
     if old_chat_id:
-        thread_key = f"thread_{old_chat_id}"
-        rag_store.pop(thread_key, None)
+        rag_store.pop(f"thread_{old_chat_id}", None)
 
-    # Refresh the browser session_id for anonymous users
+    # 2. ALSO clear the current browser-session based memory (important for anonymous/new users)
+    current_sid = session.get("session_id")
+    if current_sid:
+        rag_store.pop(current_sid, None)
+        rag_store.pop(f"thread_new_{current_sid}", None)
+
+    # 3. Refresh the browser session_id
     session["session_id"] = str(uuid.uuid4())
     return jsonify({"status": "ok"})
 
