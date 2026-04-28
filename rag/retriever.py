@@ -3,6 +3,7 @@ import time
 from typing import List
 from concurrent.futures import ThreadPoolExecutor
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
 from rag.llm import get_vector_db, get_structured_llm, get_minimal_structured_llm, SchemeOutput
 from rag.utils import format_docs, scheme_name_similarity
 from rag.intent import is_direct_scheme_name_query, rewrite_question
@@ -66,6 +67,19 @@ SYNONYMS = {
     "marriage": ["vivah", "lagana", "shadi", "kanyadan", "marriage"],
 }
 
+# High-accuracy mapping for 'Quick Start' / suggestion box chips
+# Keys should be lowercase and without emojis for consistent matching
+CATEGORICAL_QUICK_START = {
+    "schemes for farmers": {"topic": "Agriculture", "extra_keywords": ["Farmer", "Khedut", "Kisan", "Crop", "Agriculture"]},
+    "women welfare schemes": {"topic": "Women", "extra_keywords": ["Women", "Mahila", "Girl", "Lady", "Child"]},
+    "education scholarships": {"topic": "Education", "extra_keywords": ["Scholarship", "Student", "Vidhyarthi", "Learning", "Education"]},
+    "healthcare schemes": {"topic": "Health", "extra_keywords": ["Health", "Medical", "Hospital", "Aarogya", "Sanitation"]},
+    "housing scheme": {"topic": "Housing", "extra_keywords": ["Housing", "Awas", "Makaan", "Home"]},
+    "startup schemes for youth": {"topic": "Business", "extra_keywords": ["Business", "Startup", "Entrepreneurship", "Employment", "Job", "Skill"]},
+    "schemes in gujarat": {"topic": "Gujarat", "extra_keywords": ["Gujarat"]},
+    "skill development programs": {"topic": "Skills", "extra_keywords": ["Skills", "Kaushal", "Training", "Employment"]},
+}
+
 def extract_search_topic(question: str) -> str:
     """Strip filler words, keep the core topic for vector DB search."""
     FILLER = {
@@ -98,13 +112,50 @@ def extract_search_topic(question: str) -> str:
     return " ".join(core) if core else question
 
 
+def _fetch_schemes_by_category(topic: str, keywords: list, k: int = 5) -> List[SchemeOutput]:
+    """Search specifically for schemes matching a category topic or set of keywords."""
+    from database.db import SessionLocal
+    from database.models import Scheme
+    from sqlalchemy import or_
+    
+    session = SessionLocal()
+    try:
+        filters = []
+        # Match topic or keywords in category OR name
+        for phrase in [topic] + keywords:
+            pattern = f"%{phrase}%"
+            filters.append(Scheme.category.ilike(pattern))
+            filters.append(Scheme.scheme_name.ilike(pattern))
+            
+        schemes = session.query(Scheme).filter(or_(*filters)).limit(k).all()
+        results = []
+        for s in schemes:
+            results.append(SchemeOutput(
+                scheme_name=s.scheme_name,
+                description=s.description or '',
+                category=s.category or '',
+                benefits=s.benefits or '',
+                eligibility=s.eligibility or '',
+                documents_required=s.documents_required or '',
+                application_process=s.application_process or '',
+                state=s.state or 'Gujarat',
+                official_link=s.application_link or ''
+            ))
+        print(f"  [CATEGORICAL] SQL search for '{topic}' returned {len(results)} matches.")
+        return results
+    except Exception as e:
+        print(f"  [CATEGORICAL] Error: {e}")
+        return []
+    finally:
+        session.close()
+
+
 def _sql_fallback_search(query: str, k: int = 5):
     """
     Fallback: search the relational 'schemes' table using ILIKE keywords
     when vector search returns empty (e.g. documents table is empty).
     Returns list of Document objects matching the format expected by the RAG pipeline.
     """
-
     try:
         from database.db import SessionLocal
         from database.models import Scheme
@@ -264,8 +315,21 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
     """
     specific_name = extract_specific_scheme_name(question, last_schemes or [])
     search_query  = specific_name if specific_name else extract_search_topic(question)
-
     standalone = rewrite_question(question, chat_history)
+
+    docs = []
+    
+    # ACCURACY TIER 0: Special handling for Quick Start chips
+    # Clean emojis and extra whitespace for robust matching
+    clean_q = re.sub(r'[^\w\s]', '', question).lower().strip()
+    clean_standalone = re.sub(r'[^\w\s]', '', standalone).lower().strip()
+    
+    if clean_q in CATEGORICAL_QUICK_START and clean_standalone == clean_q:
+        config = CATEGORICAL_QUICK_START[clean_q]
+        print(f"  [ACCURACY] Quick Start chip detected: {clean_q}. Fetching direct categorical matches...")
+        cat_matches = _fetch_schemes_by_category(config['topic'], config['extra_keywords'], k=k)
+        if cat_matches:
+            return cat_matches
 
     def _do_search(q, limit):
         # Fallback logic: "bajri (millet)" -> try "bajri", then "millet"
@@ -279,8 +343,6 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
                 res = get_vector_db().as_retriever(search_kwargs={"k": limit}).invoke(second_q)
             return res
         return get_vector_db().as_retriever(search_kwargs={"k": limit}).invoke(q)
-
-    docs = []
     
     # ACCURACY TIER 1: If user provided a specific name, check SQL first!
     if specific_name:
@@ -363,6 +425,8 @@ def fetch_schemes(question: str, chat_history: list, k: int = 5, last_schemes: l
         return []
 
 
+    if not result or not hasattr(result, 'schemes'):
+        return []
 
     return result.schemes
 

@@ -1,11 +1,9 @@
 import os
 from langchain_mistralai import ChatMistralAI
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Union, Any
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from langchain_core.documents import Document
-
-
 
 # -------------------------------------------------
 # Schemas
@@ -57,6 +55,7 @@ class SuggestionListOutput(BaseModel):
     suggestions: List[SuggestionOutput] = Field(description="List of localized suggestions")
 
 class UserProfile(BaseModel):
+    name: Optional[str] = Field(None)
     age: Optional[int] = Field(None)
     income: Optional[str] = Field(None)
     occupation: Optional[str] = Field(None)
@@ -216,7 +215,7 @@ def get_vector_db():
             try:
                 from langchain_community.vectorstores import Chroma
                 # Support both relative and absolute paths for vector_db
-                persist_dir = os.path.join(os.getcwd(), "vector_db")
+                persist_dir = os.path.join(os.getcwd(), "chroma_db_1024")
                 _vector_db = Chroma(persist_directory=persist_dir, embedding_function=get_embedding_model())
             except Exception as e:
                 print(f"  ChromaDB fallback failed: {e}")

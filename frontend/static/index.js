@@ -15,7 +15,6 @@ const VOICE_HINT = {
 };
 
 
-
 function toggleVoice() {
   if (isListening) {
     if (recognition) recognition.stop();
@@ -47,7 +46,7 @@ function toggleVoice() {
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         currentTranscript += event.results[i][0].transcript;
       }
-
+      console.log("Speech Result:", currentTranscript);
       if (currentTranscript) {
         input.value = currentTranscript;
         autoResize(input);
@@ -55,11 +54,15 @@ function toggleVoice() {
     };
 
     recognition.onend = () => {
+      console.log("Speech Recognition Ended");
       stopVoiceUI();
     };
 
     recognition.onerror = (event) => {
-      console.error("Speech Recognition Error:", event.error);
+      console.error("Speech Recognition Error:", event.error, event.message);
+      if (event.error === 'not-allowed') {
+        alert("Microphone access denied. Please enable it in your browser settings.");
+      }
       stopVoiceUI();
     };
 
@@ -172,53 +175,66 @@ async function speakText(text, btn, lang) {
   }
 
   const targetLang = lang || currentLang;
-  const url = `/tts?text=${encodeURIComponent(text)}&lang=${targetLang}`;
-  const audio = new Audio(url);
-  currentAudio = audio;
-
-  // Ensure any existing reading state is cleared
-  document.querySelectorAll('.reading-active').forEach(el => el.classList.remove('reading-active'));
-
+  
   // Find the bubble or card associated with this button
   let container = null;
   if (btn) {
-    // If it's a bubble, use it. If it's a card, use the WHOLE card
     container = btn.closest('.bubble') || btn.closest('.scheme-card');
+    btn.textContent = '⌛...';
+    btn.dataset.speaking = '1';
   }
 
   if (container) {
     container.classList.add('reading-active');
   }
 
-  if (btn) {
-    btn.textContent = '⌛...';
-    btn.dataset.speaking = '1';
+  try {
+    // We use POST to support very long texts (schemes list, etc)
+    const res = await fetch('/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: targetLang })
+    });
 
-    audio.onplay = () => { btn.textContent = '⏹ Stop'; };
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
 
+    const blob = await res.blob();
+    const audioUrl = URL.createObjectURL(blob);
+    const audio = new Audio(audioUrl);
+    currentAudio = audio;
+
+    audio.onplay = () => { if (btn) btn.textContent = '⏹ Stop'; };
+    
     const cleanup = () => {
       if (btn) {
         btn.textContent = '🔊 Listen';
         btn.dataset.speaking = '0';
       }
       if (container) container.classList.remove('reading-active');
-      document.querySelectorAll('.tts-word.active').forEach(w => w.classList.remove('active'));
-      currentAudio = null;
+      URL.revokeObjectURL(audioUrl);
+      if (currentAudio === audio) currentAudio = null;
     };
 
     audio.onended = cleanup;
-    audio.onerror = cleanup;
+    audio.onerror = (e) => {
+      console.error("Audio playback error:", e);
+      cleanup();
+      if (btn) {
+        btn.textContent = '❌ Error';
+        setTimeout(() => { btn.textContent = '🔊 Listen'; }, 2000);
+      }
+    };
     audio.onpause = cleanup;
-  }
 
-  try {
     await audio.play();
   } catch (err) {
-    console.error("Playback failed:", err);
+    console.error("TTS Playback failed:", err);
     if (btn) {
-      btn.textContent = '🔊 Listen';
+      btn.textContent = '❌ Error';
       btn.dataset.speaking = '0';
+      setTimeout(() => { btn.textContent = '🔊 Listen'; }, 2000);
     }
+    if (container) container.classList.remove('reading-active');
   }
 }
 
@@ -249,12 +265,10 @@ function updateThemeIcon(isDark) {
 
 function initTheme() {
   const savedTheme = localStorage.getItem('theme');
-  let isDark = false;
-
+  let isDark = true; // Default to dark 
+  
   if (savedTheme) {
     isDark = savedTheme === 'dark';
-  } else {
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   }
 
   if (isDark) {
@@ -378,6 +392,7 @@ async function handleResetPassword() {
 let currentUser = null;
 let currentChatId = null;
 let currentChatMessages = [];
+let isGenerating = false;
 
 async function handleLogin() {
   const email = document.getElementById('login-email').value;
@@ -503,13 +518,15 @@ window.onload = async () => {
   initTheme();
   setLang('en');
   updateUserUI();
-  fetchSuggestions(); // Load autocomplete data
   const res = await fetch('/me');
   const data = await res.json();
   if (data.user) {
     currentUser = data.user;
     updateUserUI();
     loadHistory();
+    loadNotifications();
+    // Check for new notifications every 5 minutes
+    setInterval(loadNotifications, 5 * 60 * 1000);
   }
 };
 
@@ -626,7 +643,7 @@ function switchChat(chatData) {
 }
 
 async function saveChat(userMsg, aiResult) {
-  if (!currentUser) return;
+  if (!currentUser) return null;
   currentChatMessages.push({ role: 'user', content: userMsg }, { role: 'assistant', result: aiResult });
 
   // Only suggest/send a title on the very first message save of a new chat
@@ -639,41 +656,26 @@ async function saveChat(userMsg, aiResult) {
   });
 
   const data = await res.json();
-  if (res.ok) { currentChatId = data.chat_id; loadHistory(); }
+  if (res.ok) {
+    currentChatId = data.chat_id;
+    loadHistory();
+    return data.chat_id;  // Thread-wise: return chat_id so sendMessage can update currentChatId
+  }
+  return null;
 }
 
 function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-  if (typeof handleAutocomplete === 'function') handleAutocomplete();
 }
 
 
 function handleKey(e) {
-  if (isAgentBusy) return;
-  if (e.key === 'Enter' && !e.shiftKey) {
-    if (typeof suggestionBox !== 'undefined' && suggestionBox && !suggestionBox.classList.contains('hidden')) {
-      if (typeof selectedSuggestionIndex !== 'undefined' && selectedSuggestionIndex > -1) {
-        return;
-      }
-    }
-    e.preventDefault();
-    sendMessage();
+  if (e.key === 'Enter' && !e.shiftKey) { 
+    e.preventDefault(); 
+    sendMessage(); 
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -739,33 +741,13 @@ function renderResult(result) {
     attachSpeak = { id: speakId, text: replyText };
   }
   else if (result.type === 'names_only') {
-    const schemes = result.schemes || [];
-    const replyText = result.reply || (currentLang === 'hi' ? 'मुझे ये योजनाएं मिलीं:' : (currentLang === 'gu' ? 'મને આ યોજનાઓ મળી:' : 'I found these schemes:'));
     const speakId = 'speak-' + Date.now();
-
-    const pillNames = schemes.map(s => s.scheme_name).filter(Boolean);
-    const sequenceBody = [replyText, ...pillNames];
-
-    const buttons = schemes.map(s => {
-      const name = s.scheme_name || '';
-      return `<button class="scheme-select-btn" onclick="askQuestion('${name.replace(/'/g, "\\'")}')">${escapeHtml(name)}</button>`;
-    }).join('');
-
-    content = `<div class="bubble ai" style="border: 1px solid var(--saffron); background: rgba(255,103,31,0.02); padding: 15px;">
-      <div style="font-weight: 600; color: var(--saffron); margin-bottom: 8px; font-family: 'Rajdhani', sans-serif; font-size: 15px;">
-        📋 ${escapeHtml(replyText)}
-        <br><button class="speak-btn" id="${speakId}" data-speaking="0" style="margin-top:5px">🔊 Listen</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;">${buttons}</div>
-      <div style="margin-top:12px; border-top:1px solid rgba(0,0,0,0.05); padding-top:6px; font-size:11px; color:var(--muted); font-style:italic">
-        💡 Click on any scheme above to see full details.
-      </div>
+    content = `<div class="bubble ai">
+      <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">📋 Government Schemes Found</strong>
+      <div style="margin-top:10px;line-height:2">${escapeHtml(result.reply)}</div>
+      <br><button class="speak-btn" id="${speakId}" data-speaking="0">🔊 Listen</button>
     </div>`;
-
-    setTimeout(() => {
-      const btn = document.getElementById(speakId);
-      if (btn) btn.onclick = () => speakSequence(sequenceBody, btn, result.lang || currentLang);
-    }, 10);
+    attachSpeak = { id: speakId, text: result.reply };
   }
   else if (result.type === 'specific_field') {
     const field = (result.field || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -782,20 +764,16 @@ function renderResult(result) {
       const temp = document.createElement('div');
       temp.innerHTML = cardHtml;
       const card = temp.firstElementChild;
-
-      // Manual binding for Listen button
+      
       const btn = card.querySelector('.speak-btn');
-      if (btn) {
-        btn.onclick = () => speakText(btn.dataset.tts, btn);
-      }
+      if (btn) btn.onclick = () => speakText(btn.dataset.tts, btn);
       wrapper.appendChild(card);
     });
-    content = wrapper.outerHTML; // Wait, actually I should append wrapper directly
     row.innerHTML = avatar;
     row.appendChild(wrapper);
     chat.appendChild(row);
     scrollBottom();
-    return; // handle manually
+    // Do NOT return here, so it flows into auto-read logic below
   }
   else if (result.type === 'eligibility_result') {
     const schemes = result.schemes || [];
@@ -811,7 +789,7 @@ function renderResult(result) {
           <span style="background:var(--green);color:white;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i + 1}</span>
           <strong class="clickable-scheme-name" onclick="askQuestion('${(s.scheme_name || '').replace(/'/g, "\\'")}')" style="color:var(--saffron);font-size:14px;cursor:pointer;text-decoration:underline">${escapeHtml(s.scheme_name || '')}</strong>
         </div>
-        ${s.why_eligible ? `<div style="color:#138808;font-size:12px;margin-top:4px">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
+        ${s.why_eligible ? `<div style="color:var(--green);font-size:12px;margin-top:4px">✅ ${escapeHtml(s.why_eligible)}</div>` : ''}
         ${s.category ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📂 ${escapeHtml(s.category)}</div>` : ''}
         ${s.state ? `<div style="color:var(--muted);font-size:12px;margin-top:3px">📍 ${escapeHtml(s.state)}</div>` : ''}
         ${s.official_link && !['not available', 'n/a', 'none', ''].includes((s.official_link || '').toLowerCase())
@@ -819,6 +797,7 @@ function renderResult(result) {
       </div>`).join('');
 
     content = `<div class="bubble ai">
+      ${result.preface ? `<div style="margin-bottom:12px;font-size:15px;color:var(--fg);line-height:1.5">${escapeHtml(result.preface)}</div>` : ''}
       <strong style="color:var(--saffron);font-family:'Rajdhani',sans-serif;font-size:15px;">🎯 Eligible Schemes Found (${schemes.length})</strong>
       ${profileLines ? `<div style="margin-top:8px;font-size:12px;color:var(--muted);line-height:1.8">${profileLines}</div>` : ''}
       ${schemeCards}
@@ -838,7 +817,7 @@ function renderResult(result) {
 
     const schemeRows = schemes.map((s, i) => {
       const icon = s.is_eligible ? '✅' : '❌';
-      const color = s.is_eligible ? '#138808' : '#c00';
+      const color = s.is_eligible ? 'var(--green)' : 'var(--red, #e53e3e)';
       return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
         <span style="font-size:15px;flex-shrink:0">${icon}</span>
         <div>
@@ -867,9 +846,11 @@ function renderResult(result) {
     content = `<div class="bubble ai" style="color:var(--muted);">Received an unexpected response. Please try again.</div>`;
   }
 
-  row.innerHTML = avatar + content;
-  chat.appendChild(row);
-  scrollBottom();
+  if (result.type !== 'full_detail') {
+    row.innerHTML = avatar + content;
+    chat.appendChild(row);
+    scrollBottom();
+  }
 
   const responseLang = result.lang || currentLang;
 
@@ -1071,23 +1052,25 @@ function buildSchemeCard(s, i) {
 }
 
 async function sendMessage() {
-  if (isAgentBusy) return;
+  if (isGenerating) return;
   const q = input.value.trim();
   if (!q) return;
 
-  isAgentBusy = true;
-  document.body.classList.add('agent-busy');
+  isGenerating = true;
   addUserMessage(q);
   input.value = '';
   input.style.height = 'auto';
+  if (suggestionBox) suggestionBox.classList.add('disabled');
   sendBtn.disabled = true;
+  input.readOnly = true;
+
   const typing = addTyping();
 
   try {
     const res = await fetch('/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, lang: currentLang })
+      body: JSON.stringify({ question: q, lang: currentLang, chat_id: currentChatId })
     });
 
     if (!res.ok) {
@@ -1132,12 +1115,12 @@ async function sendMessage() {
               if (streamingBubble) { streamingBubble.innerHTML = escapeHtml(fullText); scrollBottom(); }
             } else if (data.type === 'conversational_end') {
               if (streamingRow) streamingRow.remove();
-              if (fullText && fullText.trim()) {
-                const result = { type: 'conversational', reply: fullText, lang: serverLang };
-                renderResult(result);
-                saveChat(q, result);
-              }
-            } else if (data.type === 'schemes_start' || data.type === 'eligibility_start') {
+              const result = { type: 'conversational', reply: fullText, lang: serverLang };
+              renderResult(result);
+              // Thread-wise: await saveChat and capture the returned chat_id for new threads
+              const newId1 = await saveChat(q, result);
+              if (newId1 && !currentChatId) currentChatId = newId1;
+            } else if (data.type === 'schemes_start') {
               removeTyping();
               const row = document.createElement('div');
               row.className = 'msg-row ai';
@@ -1224,12 +1207,14 @@ async function sendMessage() {
               if (streamingRow) streamingRow.remove();
               data.type = 'full_detail'; data.lang = serverLang;
               renderResult(data);
-              saveChat(q, data);
+              const newId2 = await saveChat(q, data);
+              if (newId2 && !currentChatId) currentChatId = newId2;
             } else {
               removeTyping();
               if (!data.lang) data.lang = serverLang;
               renderResult(data);
-              saveChat(q, data);
+              const newId3 = await saveChat(q, data);
+              if (newId3 && !currentChatId) currentChatId = newId3;
             }
           } catch (e) {
             console.error("Error processing stream line:", e, line);
@@ -1244,11 +1229,21 @@ async function sendMessage() {
     isAgentBusy = false;
     document.body.classList.remove('agent-busy');
     sendBtn.disabled = false;
+    isGenerating = false;
+    if (suggestionBox) suggestionBox.classList.remove('disabled');
+    input.readOnly = false;
+    input.focus();
+
   }
 }
 
 async function clearChat() {
-  await fetch('/reset', { method: 'POST' });
+  // Pass the old chat_id to the server so it can clear the thread's RAG memory
+  await fetch('/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: currentChatId })
+  });
   currentChatId = null;
   currentChatMessages = [];
   chat.innerHTML = `<div class="welcome-card">
@@ -1374,15 +1369,7 @@ window.addEventListener('click', (e) => {
   }
 });
 
-// Update window.onload to also fetch notifications
-window.onload = async () => {
-  if (originalOnload) await originalOnload();
-  if (currentUser) {
-    loadNotifications();
-    // Check for new notifications every 5 minutes
-    setInterval(loadNotifications, 5 * 60 * 1000);
-  }
-};
+// Notifications are now initialized in the main window.onload above
 
 // ── Suggestion Box Logic ───────────────────────────────────────────────────
 const suggestionBox = document.getElementById('suggestion-box');
@@ -1416,6 +1403,7 @@ const QUICK_START = {
 };
 
 function showSuggestions() {
+  if (isGenerating) return;
   const q = input.value.trim();
   if (!q) {
     renderSuggestions(QUICK_START[currentLang]);
@@ -1477,12 +1465,11 @@ function renderSuggestions(list) {
 }
 
 function selectSuggestion(text) {
-  if (isAgentBusy) return;
+  if (isGenerating) return;
   input.value = text;
-  suggestionBox.classList.add('hidden');
+  if (suggestionBox) suggestionBox.classList.add('hidden');
   autoResize(input);
-  input.focus();
-  sendMessage(); // Automatically trigger search when selecting a suggested pill
+  sendMessage();
 }
 
 function moveSelection(direction) {

@@ -48,28 +48,33 @@ warnings.filterwarnings("ignore")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")  # Prefer env var
 
+# Define a safe temporary directory (works on Windows & Linux/Serverless)
+TEMP_FOLDER = os.path.join(REPO_ROOT, "tmp")
+if not os.path.exists(TEMP_FOLDER):
+    os.makedirs(TEMP_FOLDER, exist_ok=True)
+
 # -------------------------------------------------
 #   Global Exception Handling & Email Alerts
 # -------------------------------------------------
 
-from werkzeug.exceptions import HTTPException
-
-@app.errorhandler(404)
-def handle_404(e):
-    """Handles 404 errors gracefully without sending admin alerts."""
-    return jsonify({
-        "error": "Not Found",
-        "message": "The requested URL was not found on the server.",
-        "type": "not_found"
-    }), 404
+# Dictionary to track last sent time of errors to prevent spam
+# Format: { error_key: last_sent_datetime }
+ERROR_COOLDOWN = {}
+COOLDOWN_PERIOD = datetime.timedelta(minutes=30)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    """Captures unhandled exceptions (500 errors) and notifies the administrator."""
-    # If it's a standard HTTP error (like 404, 405), let Flask handle it or pass it to our 404 handler
+    """Captures unhandled exceptions and notifies the administrator."""
+    # Ignore standard HTTP Errors (e.g., 404, 405, 401)
+    from werkzeug.exceptions import HTTPException
     if isinstance(e, HTTPException):
-        if e.code < 500:
-            return e
+        if getattr(e, 'code', 500) < 500:
+            return e  # Let Flask handle it normally
+            
+    # Ignore broken pipes and client disconnects
+    if isinstance(e, (ConnectionResetError, BrokenPipeError, TimeoutError)):
+        app.logger.warning(f"Client connection closed: {e}")
+        return jsonify({"error": "Connection closed"}), 499
 
     # 1. Log the error locally
     app.logger.error(f"Unhandled Exception: {e}")
@@ -83,17 +88,45 @@ def handle_exception(e):
     request_data = request.get_data(as_text=True) or "None"
     
     # 3. Format error alert email
-    admin_email = os.getenv("SMTP_USERNAME") # Default to sender email
-    subject = f"🚨 API Error Alert: {str(e)[:50]}"
+    admin_email = os.getenv("SMTP_USERNAME") 
+    subject = f"🚨 Yojana AI Error: {str(e)[:50]}"
     
+    # --- THROTTLING LOGIC ---
+    # We use a key based on the error message and the location of the error (last line of trace)
+    try:
+        error_lines = [l for l in trace.split('\n') if l.strip()]
+        last_stack = error_lines[-2] if len(error_lines) > 2 else "Unknown"
+        error_key = f"{type(e).__name__}: {str(e)} | {last_stack}"
+    except:
+        error_key = f"{type(e).__name__}: {str(e)}"
+
+    now = datetime.datetime.now()
+    if error_key in ERROR_COOLDOWN:
+        if now - ERROR_COOLDOWN[error_key] < COOLDOWN_PERIOD:
+            app.logger.info(f"Suppressed duplicate error email for: {error_key}")
+            # Still return the error response but skip the email
+            return jsonify({
+                "error": "Internal Server Error",
+                "message": "An error occurred. Our team is already aware and working on it.",
+                "type": "server_error"
+            }), 500
+
+    # Update cooldown tracker
+    ERROR_COOLDOWN[error_key] = now
+    # -------------------------
+
     html_body = f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 2px solid #ff4d4d; padding: 25px; border-radius: 12px; max-width: 800px; margin: auto;">
-        <h2 style="color: #d11a2a; text-align: center;">Yojana AI: Critical Error Alert</h2>
+        <h2 style="color: #d11a2a; text-align: center;">Yojana AI: Internal API Error Alert</h2>
         <hr style="border: 1px solid #d11a2a; margin-bottom: 20px;">
         
+        <p style="background: #fff5f5; padding: 10px; border-left: 5px solid #d11a2a;">
+            <strong>Note:</strong> This error will be suppressed for the next 30 minutes to avoid flooding your inbox.
+        </p>
+
         <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px; font-weight: bold; width: 30%;">Error Message:</td><td style="padding: 8px;">{str(e)}</td></tr>
-            <tr><td style="padding: 8px; font-weight: bold;">Timestamp:</td><td style="padding: 8px;">{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">Timestamp:</td><td style="padding: 8px;">{now.strftime('%Y-%m-%d %H:%M:%S')}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">Request URL:</td><td style="padding: 8px;">{request_url}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">HTTP Method:</td><td style="padding: 8px;">{request_method}</td></tr>
             <tr><td style="padding: 8px; font-weight: bold;">User context:</td><td style="padding: 8px;">{user_name} (ID: {user_id})</td></tr>
@@ -115,8 +148,6 @@ def handle_exception(e):
     """
     
     # 4. Send the alert
-    # We do this in a thread or simple call. Given this is an error handler,
-    # we'll try to send it quickly.
     try:
          send_email(
             to_email=admin_email,
@@ -137,8 +168,6 @@ def handle_exception(e):
     # typically works for standard JSON/HTML routes.
     return jsonify(res), 500
 
-# Global cache for localized autocomplete suggestions
-SUGGESTION_CACHE = {}
 
 #    Serverless Database Management                                          
 @app.teardown_appcontext
@@ -161,6 +190,7 @@ def _warmup():
         warmup()
     except Exception as e:
         print(f"    Warmup failed (non-fatal): {e}")
+
 
 threading.Thread(target=_warmup, daemon=True).start()
 
@@ -284,41 +314,69 @@ def ask():
     from flask import Response, stream_with_context
     import json
     from rag.agent import ask_agent
+    from rag.memory import seed_session_from_db
     
     data = request.get_json()
     q = data.get("question", "").strip()
     ui_lang = data.get("lang")
-    session_id = session.get("session_id", "user_1")
     
+    # --- Thread-wise Memory ---
+    # If the user is logged in and sends a chat_id, use it as the unique RAG session.
+    # This ensures each thread has isolated AI memory.
+    # For anonymous users, fall back to the single browser session_id.
+    chat_id = data.get("chat_id")   # Sent by the frontend
+    user_id = session.get("user_id")
+
+    if user_id and chat_id:
+        # Logged-in user resuming an existing thread
+        rag_session_id = f"thread_{chat_id}"
+        # Seed in-memory history from DB so context survives server restarts
+        db = SessionLocal()
+        try:
+            existing_chat = db.query(ChatHistory).filter(
+                ChatHistory.id == chat_id,
+                ChatHistory.user_id == user_id
+            ).first()
+            if existing_chat and existing_chat.messages:
+                seed_session_from_db(rag_session_id, existing_chat.messages)
+        finally:
+            db.close()
+    elif user_id and not chat_id:
+        # Logged-in user starting a BRAND NEW thread (chat_id will be created after first message)
+        # Use a temporary unique id; frontend will send chat_id on subsequent messages
+        rag_session_id = f"thread_new_{session.get('session_id', str(uuid.uuid4()))}"
+    else:
+        # Anonymous user: use the single browser session
+        rag_session_id = session.get("session_id", "user_1")
+
     if not q:
         return jsonify({"error": "Empty question"}), 400
     
     # Check if user is logged in to provide context
     user_context = None
-    if "user_id" in session:
+    if user_id:
         db = SessionLocal()
-        user = db.query(User).filter(User.id == session["user_id"]).first()
+        user = db.query(User).filter(User.id == user_id).first()
         if user:
             user_context = {
+                "name": user.full_name,
                 "age": user.age,
                 "gender": user.gender,
                 "income": str(user.income) if user.income else None,
                 "occupation": user.occupation,
-                "state": user.residence, # Map residence to state
-                "caste_category": user.category # Map category to caste_category
+                "state": user.residence,
+                "caste_category": user.category
             }
         db.close()
 
     def generate():
         try:
-            for chunk in ask_agent(q, session_id=session_id, ui_lang=ui_lang, user_context=user_context):
+            for chunk in ask_agent(q, session_id=rag_session_id, ui_lang=ui_lang, user_context=user_context):
                 yield f"data: {json.dumps(chunk)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
-    
-
 
 
 @app.route("/stt", methods=["POST"])
@@ -328,8 +386,13 @@ def speech_to_text():
     
     audio_file = request.files['audio']
     # Use a unique name to avoid collisions
+    temp_dir = os.path.join(app.root_path, "temp")
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+        
     temp_filename = f"stt_{uuid.uuid4()}.webm"
-    temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
+    temp_path = os.path.join(TEMP_FOLDER, temp_filename)
+
     audio_file.save(temp_path)
     
     lang = request.args.get("lang", "en")
@@ -371,14 +434,19 @@ def speech_to_text():
             os.remove(temp_path)
 
 
-@app.route("/tts", methods=["GET"])
+@app.route("/tts", methods=["GET", "POST"])
 def text_to_speech():
     from flask import send_file
     import asyncio
     from utils.voice import generate_speech
     
-    text = request.args.get("text", "")
-    lang = request.args.get("lang", "en")
+    if request.method == "POST":
+        data = request.json
+        text = data.get("text", "")
+        lang = data.get("lang", "en")
+    else:
+        text = request.args.get("text", "")
+        lang = request.args.get("lang", "en")
     
     print(f"TTS REQUEST: lang={lang}, text_len={len(text)}, text_start={text[:50]!r}")
     
@@ -386,25 +454,32 @@ def text_to_speech():
         return jsonify({"error": "No text provided"}), 400
     
     try:
-        # Create a temporary file name for TTS
+        # Create a unique temporary file name
         temp_filename = f"tts_{uuid.uuid4()}.mp3"
-        temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
-        
-        # Run the async function from sync Flask
-        asyncio.run(generate_speech(text, lang, temp_path))
-        
-        def generate_and_cleanup():
-            with open(temp_path, "rb") as f:
-                yield from f
-            try:
-                if os.path.exists(temp_path): os.remove(temp_path)
-            except Exception as e:
-                print(f"Cleanup Error: {e}")
+        temp_path = os.path.join(TEMP_FOLDER, temp_filename)
 
-        return Response(generate_and_cleanup(), mimetype="audio/mpeg")
+        # Run the async function from sync Flask safely
+        def run_async(coro):
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+
+        output_path = run_async(generate_speech(text, lang, temp_path))
+        
+        if not output_path or not os.path.exists(output_path):
+            return jsonify({"error": "TTS generation failed or no speakable text found"}), 500
+        
+        # We don't delete immediately because send_file needs it. 
+        # In a real app, you'd use a background task or a cleanup job.
+        return send_file(output_path, mimetype="audio/mpeg")
         
     except Exception as e:
-        print(f"TTS Error: {e}")
+        import traceback
+        trace = traceback.format_exc()
+        app.logger.error(f"TTS Error: {e}\n{trace}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -830,7 +905,8 @@ def whatsapp_webhook():
             media_response = requests.get(media_url, auth=auth)
             
             temp_ext = media_type.split('/')[-1]
-            temp_path = os.path.join("/tmp", f"wa_voice_{uuid.uuid4()}.{temp_ext}")
+            temp_path = os.path.join(TEMP_FOLDER, f"wa_voice_{uuid.uuid4()}.{temp_ext}")
+
             
             with open(temp_path, "wb") as f:
                 f.write(media_response.content)
@@ -933,7 +1009,8 @@ def tts_wa():
     if any('\u0a80' <= c <= '\u0aff' for c in text): lang = "gu"
     elif any('\u0900' <= c <= '\u097f' for c in text): lang = "hi"
     
-    temp_path = os.path.join("/tmp", f"wa_reply_{uuid.uuid4()}.mp3")
+    temp_path = os.path.join(TEMP_FOLDER, f"wa_reply_{uuid.uuid4()}.mp3")
+
     asyncio.run(generate_speech(text, lang, temp_path))
     def generate_and_cleanup():
         with open(temp_path, "rb") as f:
@@ -948,6 +1025,22 @@ def tts_wa():
 
 @app.route("/reset", methods=["POST"])
 def reset():
+    """Start a new chat thread: refresh session_id and optionally clear a specific thread's RAG memory."""
+    from rag.memory import store as rag_store
+    data = request.get_json(silent=True) or {}
+    
+    # 1. Clear any specific thread memory passed from frontend
+    old_chat_id = data.get("chat_id")
+    if old_chat_id:
+        rag_store.pop(f"thread_{old_chat_id}", None)
+
+    # 2. ALSO clear the current browser-session based memory (important for anonymous/new users)
+    current_sid = session.get("session_id")
+    if current_sid:
+        rag_store.pop(current_sid, None)
+        rag_store.pop(f"thread_new_{current_sid}", None)
+
+    # 3. Refresh the browser session_id
     session["session_id"] = str(uuid.uuid4())
     return jsonify({"status": "ok"})
 
