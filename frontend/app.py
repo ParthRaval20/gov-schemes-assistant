@@ -48,10 +48,10 @@ warnings.filterwarnings("ignore")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")  # Prefer env var
 
-# Define a safe temporary directory (works on Windows & Linux/Serverless)
-TEMP_FOLDER = os.path.join(REPO_ROOT, "tmp")
-if not os.path.exists(TEMP_FOLDER):
-    os.makedirs(TEMP_FOLDER, exist_ok=True)
+import tempfile
+
+# Define a safe temporary directory that works on Windows and Vercel's read-only filesystem
+TEMP_FOLDER = tempfile.gettempdir()
 
 # -------------------------------------------------
 #   Global Exception Handling & Email Alerts
