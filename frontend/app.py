@@ -48,10 +48,13 @@ warnings.filterwarnings("ignore")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")  # Prefer env var
 
-import tempfile
-
-# Define a safe temporary directory that works on Windows and Vercel's read-only filesystem
-TEMP_FOLDER = tempfile.gettempdir()
+# Define a safe temporary directory (works on Windows & Linux/Serverless)
+# On Vercel/AWS Lambda, only /tmp is writable
+if os.path.exists("/tmp") and os.access("/tmp", os.W_OK):
+    TEMP_FOLDER = "/tmp"
+else:
+    TEMP_FOLDER = os.path.join(REPO_ROOT, "tmp")
+    os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 # -------------------------------------------------
 #   Global Exception Handling & Email Alerts
@@ -385,10 +388,7 @@ def speech_to_text():
         return jsonify({"error": "No audio file provided"}), 400
     
     audio_file = request.files['audio']
-    # Use a unique name to avoid collisions
-    temp_dir = os.path.join(app.root_path, "temp")
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
+    # Use the global safe TEMP_FOLDER for temporary files
         
     temp_filename = f"stt_{uuid.uuid4()}.webm"
     temp_path = os.path.join(TEMP_FOLDER, temp_filename)
@@ -447,8 +447,6 @@ def text_to_speech():
     else:
         text = request.args.get("text", "")
         lang = request.args.get("lang", "en")
-    
-    print(f"TTS REQUEST: lang={lang}, text_len={len(text)}, text_start={text[:50]!r}")
     
     if not text:
         return jsonify({"error": "No text provided"}), 400

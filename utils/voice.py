@@ -13,9 +13,14 @@ VOICE_MAP = {
 async def generate_speech(text, lang="en", output_path=None):
     """Generates an MP3 file from text using Edge-TTS."""
     if not output_path:
-        import tempfile
-        # Use tempfile.gettempdir() which works on Windows and Vercel
-        output_path = os.path.join(tempfile.gettempdir(), f"tts_{uuid.uuid4()}.mp3")
+        # Use /tmp for serverless environments, otherwise use a local temp folder
+        if os.path.exists("/tmp") and os.access("/tmp", os.AccessAttr.W_OK if hasattr(os, "AccessAttr") else os.W_OK):
+            temp_dir = "/tmp"
+        else:
+            temp_dir = os.path.join(os.getcwd(), "temp")
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+        output_path = os.path.join(temp_dir, f"tts_{uuid.uuid4()}.mp3")
 
     # Ensure output path is absolute and uses correct separators
     output_path = os.path.abspath(output_path)
